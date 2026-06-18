@@ -19,6 +19,19 @@
   @keyframes toastin{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
   .modalbg{position:fixed;inset:0;background:rgba(20,20,20,.4);display:none;align-items:flex-start;justify-content:center;z-index:80;padding:40px 16px;overflow:auto}
   .modalbg.show{display:flex}
+  /* mobile responsive */
+  @media (max-width:860px){
+    .grid2{grid-template-columns:1fr !important}
+    .tmain{padding:16px 13px 48px !important}
+    .thdr{height:auto !important;padding:10px 13px !important;flex-wrap:wrap !important;gap:10px !important}
+    .tnav{order:5;width:100%;justify-content:center}
+    .tspacer{display:none !important}
+    h1{font-size:21px !important}
+  }
+  @media (max-width:560px){
+    .tnav button{flex:1;justify-content:center}
+    .modalbg{padding:16px 10px !important}
+  }
 </style>
 </head>
 <body>
@@ -129,15 +142,15 @@ function headerHTML() {
   const aBadge = triggered ? `<span style="background:#E0504F;color:#fff;font-size:10px;font-weight:700;border-radius:20px;padding:1px 6px;font-family:'JetBrains Mono',monospace">${triggered}</span>` : '';
   const live = !!S.payload.ts;
   return `<header style="position:sticky;top:0;z-index:40;background:rgba(244,243,239,.88);backdrop-filter:blur(12px);border-bottom:1px solid #E4E2DA">
-    <div style="max-width:1340px;margin:0 auto;padding:0 28px;height:62px;display:flex;align-items:center;gap:24px">
+    <div class="thdr" style="max-width:1340px;margin:0 auto;padding:0 28px;height:62px;display:flex;align-items:center;gap:24px">
       <div style="display:flex;align-items:center;gap:11px">
         <div style="width:31px;height:31px;border-radius:9px;background:${ACCENT};display:flex;align-items:center;justify-content:center">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M2 14c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 19c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg>
         </div>
         <div style="font-weight:800;font-size:19px;letter-spacing:-.03em">Tide</div>
       </div>
-      <nav style="display:flex;gap:3px;background:#ECEAE2;padding:4px;border-radius:11px">${nav('scanner', 'Scanner')}${nav('watch', 'Watchlist')}${nav('alerts', 'Alerts', aBadge)}${nav('paper', 'Paper')}</nav>
-      <div style="flex:1"></div>
+      <nav class="tnav" style="display:flex;gap:3px;background:#ECEAE2;padding:4px;border-radius:11px">${nav('scanner', 'Scanner')}${nav('watch', 'Watchlist')}${nav('alerts', 'Alerts', aBadge)}${nav('paper', 'Paper')}</nav>
+      <div class="tspacer" style="flex:1"></div>
       <div id="trustBadge"></div>
       <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#5C5B64;font-weight:500">
         <span style="width:8px;height:8px;border-radius:50%;background:${live ? '#11A06B' : '#B7B6AE'};animation:${live ? 'tidepulse 2s infinite' : 'none'}"></span>
@@ -249,7 +262,7 @@ function featuredHTML(f) {
   ].map(g => `<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:12.5px;font-weight:600;color:#43424A">${g.label} <span style="font-size:9px;font-weight:700;color:${ACCENT};background:${ACCENT_SOFT};padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em">model est.</span></span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${g.vc}">${g.val}</span></div><div style="height:7px;background:#F0EEE7;border-radius:5px;overflow:hidden"><div style="height:100%;border-radius:5px;width:${g.pct}%;background:${g.color}"></div></div><div style="font-size:11px;color:#9C9CA6;margin-top:5px;line-height:1.4">${g.detail}</div></div>`).join('');
   const factors = ((f.prediction && f.prediction.contributions) || []).slice(0, 3).map(x => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:${x.value >= 0 ? '#11A06B' : '#E0504F'}"></span><span style="font-size:12.5px;color:#43424A;flex:1">${esc(x.feature.replace(/_/g, ' '))}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#6E6E78">${x.value >= 0 ? '+' : ''}${x.value.toFixed(2)}</span></div>`).join('') || '<div style="font-size:12px;color:#9C9CA6">No model contributions (running on activity score).</div>';
   const ch = f.session_pct;
-  return `<div style="display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:20px">
+  return `<div class="grid2" style="display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:20px">
     <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
         <div style="display:flex;gap:14px;align-items:center"><div style="width:46px;height:46px;border-radius:12px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">${esc(f.symbol.slice(0, 2))}</div>
@@ -329,7 +342,7 @@ function alertFormHTML() {
 function alertsHTML() {
   return `<h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Alerts</h1>
     <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">Arm triggers on price or conviction. The live feed fires them automatically.</p>
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start">
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start">
       <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden"><div id="alertList">${alertsListHTML()}</div></div>
       <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:18px 19px;box-shadow:0 1px 2px rgba(0,0,0,.03)" id="alertForm">${alertFormHTML()}</div>
     </div>`;
@@ -373,7 +386,7 @@ function viewHTML() {
   return scannerHTML();
 }
 function renderShell() {
-  document.getElementById('app').innerHTML = headerHTML() + `<main style="max-width:1340px;margin:0 auto;padding:26px 28px 60px"><div id="viewRoot">${viewHTML()}</div></main>`;
+  document.getElementById('app').innerHTML = headerHTML() + `<main class="tmain" style="max-width:1340px;margin:0 auto;padding:26px 28px 60px"><div id="viewRoot">${viewHTML()}</div></main>`;
   renderTrust(); renderToasts();
   if (S.view === 'scanner') mountTV();
   if (S.view === 'paper') loadPortfolio();
