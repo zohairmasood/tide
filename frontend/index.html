@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tide · Predictive Momentum</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#10151f; --line:#1d2533; --ink:#e8edf4;
+    --dim:#7c8aa0; --faint:#4a5568;
+    --rise:#3ddc97; --fall:#ff5c6c; --flat:#8a96a8; --warn:#ffb454;
+    --beam:#5b8cff; --beam2:#9d7bff;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:"Söhne","Inter",system-ui,-apple-system,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased;min-height:100vh;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(91,140,255,.08),transparent),radial-gradient(900px 500px at -10% 110%,rgba(157,123,255,.06),transparent);}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 22px 60px}
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:20px}
+  .brand{display:flex;align-items:baseline;gap:14px}
+  .mark{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.32em;color:var(--beam);text-transform:uppercase;border:1px solid var(--line);padding:6px 11px;border-radius:5px;background:linear-gradient(180deg,rgba(91,140,255,.10),transparent)}
+  h1{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1}
+  .sub{color:var(--dim);font-size:13px;margin-top:6px;max-width:520px;line-height:1.5}
+  .status{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:12px;flex-wrap:wrap}
+  .pulse{display:flex;align-items:center;gap:7px;color:var(--dim)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);transition:.3s}
+  .dot.on{background:var(--rise);animation:ping 2.4s infinite}
+  @keyframes ping{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5)}70%{box-shadow:0 0 0 7px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
+  .trustbadge{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:5px 11px;cursor:pointer}
+  .trustbadge:hover{border-color:var(--faint);color:var(--ink)}
+  .trustbadge.bad{color:var(--warn);border-color:rgba(255,180,84,.4)}
+  .note{font-size:11.5px;color:var(--faint);line-height:1.55;margin:16px 0 18px;border-left:2px solid var(--line);padding-left:12px;max-width:780px}
+  .note b{color:var(--dim);font-weight:600}
+  .banner{background:rgba(255,180,84,.07);border-left:2px solid var(--warn);color:var(--warn);font-family:var(--mono);font-size:12px;padding:12px 16px;border-radius:6px;margin:14px 0;line-height:1.5}
+  .cards{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:border-color .2s}
+  .card:hover{border-color:#27324a}
+  .chead{display:flex;align-items:center;gap:18px;padding:16px 20px;cursor:pointer;flex-wrap:wrap}
+  .rank{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--faint);width:28px;text-align:center}
+  .idblock{min-width:120px}
+  .sym{font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .sector{color:var(--dim);font-size:11px;margin-top:2px}
+  .cat{display:inline-block;margin-top:4px;font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;color:var(--beam2);background:rgba(157,123,255,.10);border:1px solid rgba(157,123,255,.25);padding:2px 6px;border-radius:4px}
+  .px{font-family:var(--mono);text-align:right;min-width:96px}
+  .px .last{font-size:15px;font-weight:600}
+  .px .sess{font-size:12px;margin-top:2px}
+  .rise{color:var(--rise)} .fall{color:var(--fall)} .flat{color:var(--flat)}
+  .gauges{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+  .gauge{min-width:120px}
+  .glbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px}
+  .est{font-size:8.5px;background:rgba(91,140,255,.12);color:var(--beam);border:1px solid rgba(91,140,255,.3);border-radius:3px;padding:1px 4px;letter-spacing:.02em}
+  .gval{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.1;margin-top:3px}
+  .gmeta{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.35}
+  .gmeta.pass{color:var(--rise)} .gmeta.fail{color:var(--warn)}
+  .unavail{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-left:auto;max-width:240px;text-align:right;line-height:1.4}
+  .chev{color:var(--faint);font-size:18px;transition:transform .2s;margin-left:8px}
+  .card.open .chev{transform:rotate(90deg)}
+  .body{border-top:1px solid var(--line);padding:0;display:none}
+  .card.open .body{display:block}
+  .drivers{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px 4px}
+  .driver{font-family:var(--mono);font-size:10.5px;color:var(--dim);background:#0c1119;border:1px solid var(--line);border-radius:5px;padding:4px 9px}
+  .driver b{color:var(--ink);font-weight:600}
+  .driver .pos{color:var(--rise)} .driver .neg{color:var(--fall)}
+  .section{padding:14px 20px;border-top:1px solid var(--line)}
+  .section h4{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;font-weight:500}
+  .analyst{font-size:13px;line-height:1.6;color:var(--ink)}
+  .caveat{font-size:11.5px;color:var(--warn);margin-top:8px;line-height:1.45}
+  .news{margin-top:10px}
+  .news a{display:block;color:var(--dim);font-size:11.5px;text-decoration:none;padding:3px 0;border-bottom:1px solid rgba(29,37,51,.5)}
+  .news a:hover{color:var(--beam)}
+  .loading{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .errbox{font-family:var(--mono);font-size:11.5px;color:var(--warn);background:rgba(255,180,84,.06);border-left:2px solid var(--warn);padding:12px 16px;line-height:1.5;border-radius:4px}
+  .panel{background:#0c1119;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px 24px;align-items:start}
+  .panel .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+  .panel .big{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+  .panel .meta{font-size:11px;color:var(--dim);margin-top:5px;line-height:1.4}
+  .panel .warn{color:var(--warn)}
+  .panel .full{grid-column:1/-1;font-size:11.5px;color:var(--dim);line-height:1.55;border-top:1px solid var(--line);padding-top:12px}
+  .modal{position:fixed;inset:0;background:rgba(4,7,12,.7);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .modal.show{display:flex}
+  .mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:560px;width:100%;max-height:84vh;overflow:auto;padding:22px}
+  .mbox h3{font-size:16px;margin-bottom:4px}
+  .mbox .mclose{float:right;cursor:pointer;color:var(--faint);font-family:var(--mono)}
+  .reltable{width:100%;border-collapse:collapse;margin-top:10px;font-family:var(--mono);font-size:11px}
+  .reltable th,.reltable td{text-align:right;padding:4px 8px;border-top:1px solid var(--line);color:var(--dim)}
+  .reltable th{color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:500;font-size:9.5px}
+  .empty{text-align:center;color:var(--faint);padding:50px 0;font-family:var(--mono);font-size:13px}
+  .spark{width:90px;height:24px;vertical-align:middle}
+  footer{margin-top:30px;color:var(--faint);font-size:11px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+  /* smart money badge */
+  .smbadge{display:inline-block;margin-top:5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;color:var(--rise);background:rgba(61,220,151,.10);border:1px solid rgba(61,220,151,.28);padding:2px 6px;border-radius:4px}
+  .smbadge.sell{color:var(--fall);background:rgba(255,92,108,.10);border-color:rgba(255,92,108,.28)}
+  /* arm button */
+  .arm{font-family:var(--mono);font-size:11px;color:var(--beam);background:rgba(91,140,255,.10);border:1px solid rgba(91,140,255,.35);border-radius:6px;padding:8px 12px;cursor:pointer;white-space:nowrap;transition:.15s;margin-left:6px}
+  .arm:hover{background:rgba(91,140,255,.20);color:var(--ink)}
+  .arm small{display:block;color:var(--faint);font-size:9px;margin-top:2px}
+  .tv-slot{height:320px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .smtrade{font-family:var(--mono);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid rgba(29,37,51,.5)}
+  .smtrade .b{color:var(--rise)} .smtrade .s{color:var(--fall)}
+  /* paper portfolio drawer */
+  .paperbtn{font-family:var(--mono);font-size:11px;color:var(--rise);border:1px solid rgba(61,220,151,.3);border-radius:20px;padding:5px 11px;cursor:pointer}
+  .paperbtn:hover{color:var(--ink);border-color:var(--rise)}
+  .drawer{position:fixed;top:0;right:0;width:380px;max-width:92vw;height:100vh;background:var(--panel);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .25s ease;z-index:60;overflow-y:auto;padding:20px}
+  .drawer.show{transform:translateX(0)}
+  .drawer h3{font-size:15px;margin-bottom:2px}
+  .drawer .dclose{float:right;cursor:pointer;color:var(--faint);font-family:var(--mono)}
+  .simbadge{font-family:var(--mono);font-size:10px;color:var(--warn);background:rgba(255,180,84,.06);border-left:2px solid var(--warn);padding:8px 10px;border-radius:4px;line-height:1.45;margin:12px 0}
+  .pstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:4px 0;color:var(--dim)}
+  .pstat b{color:var(--ink)}
+  .ptable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10.5px;margin-top:8px}
+  .ptable th,.ptable td{text-align:right;padding:4px 6px;border-top:1px solid var(--line);color:var(--dim)}
+  .ptable th{color:var(--faint);text-transform:uppercase;font-size:9px;letter-spacing:.06em}
+  .ptable td.l,.ptable th.l{text-align:left}
+  .pclose{cursor:pointer;color:var(--fall);font-size:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand"><span class="mark">Tide</span><h1>Predictive Momentum</h1></div>
+      <p class="sub">Top 5 names by a calibrated model estimate of a near-term +10% move, gated by a downside-safety filter.</p>
+    </div>
+    <div class="status">
+      <div class="pulse"><span class="dot" id="dot"></span><span id="conn">connecting</span></div>
+      <div id="scanInfo" class="flat"></div>
+      <div class="trustbadge" id="trustBadge" onclick="openTrust()">model: –</div>
+      <div class="paperbtn" id="paperBtn" onclick="toggleDrawer()">paper $–</div>
+    </div>
+  </header>
+
+  <p class="note" id="disclaimer">
+    <b>These are model estimates, validated against held-out history — not guarantees.</b>
+    Each pick shows a calibrated probability of rising 10%+ within 1–2 days <b>P(pop)</b> and of not
+    dropping below the current price for ~3 weeks <b>P(safe)</b>. The events that drive large moves are
+    only partly captured by price signals, so estimates are honest but imperfect — the trust badge shows
+    the model's Brier score, base rate, and reliability, and the real empirical record is one click away
+    on every card. Large fast moves are genuinely rare, so the list is often short.
+  </p>
+
+  <div id="banner"></div>
+  <div class="cards" id="cards"><div class="empty">Waiting for first scan…</div></div>
+
+  <footer>
+    Tide ranks a broad cross-sector screened universe. Probabilities are model estimates shown only when
+    calibration and live data clear a quality bar; otherwise the explainable activity score and empirical
+    history are shown instead. Not investment advice.
+  </footer>
+</div>
+
+<div class="modal" id="trustModal" onclick="if(event.target===this)closeTrust()">
+  <div class="mbox" id="trustBox"></div>
+</div>
+
+<div class="drawer" id="drawer">
+  <span class="dclose" onclick="toggleDrawer()">close ✕</span>
+  <h3>Paper portfolio</h3>
+  <div id="drawerBody"><span class="loading">loading…</span></div>
+</div>
+
+<script>
+// file:// (opened directly) → local backend; otherwise same origin (served by FastAPI / hosted)
+const API = location.protocol === "file:" ? "http://localhost:8000" : location.origin;
+const WS  = API.replace("http","ws") + "/ws/leaderboard";
+const $cards = document.getElementById("cards");
+const $dot = document.getElementById("dot");
+const $conn = document.getElementById("conn");
+const $scan = document.getElementById("scanInfo");
+const $banner = document.getElementById("banner");
+
+let calib = null;          // /api/calibration payload
+let trustworthy = false;   // global gate
+let openSym = null;
+const analystCache = {};
+const likeCache = {};
+
+function cls(p){ return p>0.05?"rise":p<-0.05?"fall":"flat"; }
+function sign(p){ return (p>=0?"+":"") + p.toFixed(2) + "%"; }
+function pct(x){ return (x===null||x===undefined)?"–":(x*100).toFixed(0)+"%"; }
+function fmtPct(v){ return (v===null||v===undefined)?"–":v.toFixed(1)+"%"; }
+function ago(ts){ if(!ts) return "–"; const s=Math.max(0,Math.round(Date.now()/1000-ts)); return s<90?s+"s":Math.round(s/60)+"m"; }
+
+function loadCalibration(){
+  fetch(API+"/api/calibration").then(r=>r.json()).then(d=>{
+    calib=d;
+    const badge=document.getElementById("trustBadge");
+    if(!d.available){ trustworthy=false; badge.textContent="model: none"; badge.classList.add("bad"); renderBanner(); return; }
+    trustworthy = !!d.trustworthy;
+    const b = d.validation && d.validation.pop ? d.validation.pop.brier : null;
+    badge.textContent = "model "+(d.synthetic?"(synthetic) ":"")+(d.model_version||"")+" · Brier "+(b===null?"–":b);
+    badge.classList.toggle("bad", !trustworthy);
+    renderBanner();
+  }).catch(()=>{});
+}
+
+function renderBanner(){
+  if(calib && calib.available && !trustworthy){
+    $banner.innerHTML = `<div class="banner">Model present but not yet validated to display-quality calibration — showing the activity score and empirical history instead of headline probabilities.</div>`;
+  } else if(calib && calib.synthetic){
+    $banner.innerHTML = `<div class="banner">Running on a <b>synthetic</b> model artifact (no market data). Probabilities demonstrate the pipeline, not real forecasts.</div>`;
+  } else { $banner.innerHTML=""; }
+}
+
+function baseRatePop(){ try{ return calib.validation.pop.base_rate; }catch(e){ return null; } }
+
+function gaugeHTML(pred){
+  const showProb = trustworthy && pred && pred.available && pred.data_sufficient && pred.p_pop!==null;
+  if(!showProb){
+    let why = "model unavailable";
+    if(pred && !pred.data_sufficient) why = "insufficient live data to estimate";
+    else if(calib && calib.available && !trustworthy) why = "model not display-validated";
+    return `<div class="unavail">${why}<br><span class="flat">ranked by activity score</span></div>`;
+  }
+  const br = baseRatePop();
+  const mult = (br && br>0) ? (pred.p_pop/br) : null;
+  const brTxt = mult ? `${(pred.p_pop*100).toFixed(0)}% — ${mult.toFixed(1)}× base rate (${(br*100).toFixed(0)}%)` : `model estimate`;
+  const safePass = pred.safe_gate_passed;
+  return `<div class="gauges">
+    <div class="gauge">
+      <div class="glbl">P(pop) +10% / 1-2d <span class="est">model est.</span></div>
+      <div class="gval ${pred.p_pop>= (br?br*1.5:.1) ?'rise':''}">${pct(pred.p_pop)}</div>
+      <div class="gmeta">${brTxt}</div>
+    </div>
+    <div class="gauge">
+      <div class="glbl">P(safe) ~3wk</div>
+      <div class="gval">${pct(pred.p_safe)}</div>
+      <div class="gmeta ${safePass?'pass':'fail'}">${safePass?'passes downside filter':'below downside filter'}</div>
+    </div>
+  </div>`;
+}
+
+function driversHTML(pred){
+  if(!pred || !pred.contributions || !pred.contributions.length) return "";
+  const items = pred.contributions.map(c=>{
+    const cl = c.value>=0?"pos":"neg";
+    return `<span class="driver">${c.feature.replace(/_/g," ")} <b class="${cl}">${c.value>=0?"+":""}${c.value.toFixed(2)}</b></span>`;
+  }).join("");
+  return `<div class="drivers">${items}</div>`;
+}
+
+function render(rows, payload){
+  $scan.textContent = "last full scan "+ago(payload.last_screen_ts)+" ago";
+  if(!rows || !rows.length){ $cards.innerHTML=`<div class="empty">No names currently clear the filters — that's expected; large fast moves are rare.</div>`; return; }
+  $cards.innerHTML = rows.map((r,i)=>{
+    const cat = r.catalyst_note ? `<div class="cat">${r.catalyst_note}</div>`:"";
+    return `<div class="card" data-sym="${r.symbol}">
+      <div class="chead">
+        <div class="rank">${i+1}</div>
+        <div class="idblock"><div class="sym">${r.symbol}</div><div class="sector">${r.sector}</div>${cat}${smBadge(r.smart_money)}</div>
+        <div class="px"><div class="last">$${r.last.toFixed(2)}</div><div class="sess ${cls(r.session_pct)}">${sign(r.session_pct)}</div></div>
+        ${gaugeHTML(r.prediction)}
+        ${armBtnHTML(r)}
+        <span class="chev">›</span>
+      </div>
+      <div class="body">
+        ${driversHTML(r.prediction)}
+        <div class="section"><h4>Analyst note</h4><div class="analyst-slot"><span class="loading">expand to load…</span></div></div>
+        <div class="section sm-section"><h4>Smart money — congressional trades</h4><div class="sm-slot"></div></div>
+        <div class="section"><h4>Price chart <span class="flat" style="font-weight:400">· TradingView</span></h4><div class="tv-slot" data-sym="${r.symbol}"></div></div>
+        <div class="section"><h4>Real historical record</h4><div class="empirical-slot"></div></div>
+      </div>
+    </div>`;
+  }).join("");
+  $cards.querySelectorAll(".card").forEach(card=>{
+    card.querySelector(".chead").onclick=()=>toggle(card);
+    const ab=card.querySelector(".arm");
+    if(ab) ab.onclick=(e)=>{ e.stopPropagation(); armTrade(card.dataset.sym, ab); };
+  });
+  if(openSym){ const c=$cards.querySelector(`.card[data-sym="${openSym}"]`); if(c) openCard(c,true); }
+}
+
+function armBtnHTML(r){
+  const p=r.prediction;
+  const ok = p && p.available && p.data_sufficient && p.safe_gate_passed && trustworthy;
+  if(!ok) return "";
+  return `<button class="arm">Arm paper trade<small>target +10% · stop −5% · sim</small></button>`;
+}
+function smBadge(sm){
+  if(!sm || !sm.available || (sm.net===0)) return "";
+  const buy = sm.net>0;
+  return `<span class="smbadge ${buy?'':'sell'}">${buy?'▲':'▼'} ${Math.abs(sm.net)} net congress ${buy?'buys':'sells'}</span>`;
+}
+async function armTrade(sym, btn){
+  if(btn){ btn.disabled=true; btn.textContent="arming…"; }
+  try{
+    const res=await(await fetch(API+"/api/paper/arm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:sym})})).json();
+    if(!res.ok){ alert("Could not arm: "+(res.error||"unknown")); }
+    else { openDrawer(); loadPortfolio(); }
+  }catch(e){ alert("Arm failed — is the backend running?"); }
+  finally{ if(btn){ btn.disabled=false; btn.innerHTML="Arm paper trade<small>target +10% · stop −5% · sim</small>"; } }
+}
+
+function toggle(card){
+  const sym=card.dataset.sym;
+  if(openSym===sym){ card.classList.remove("open"); openSym=null; return; }
+  if(openSym){ const o=$cards.querySelector(`.card[data-sym="${openSym}"]`); if(o)o.classList.remove("open"); }
+  openSym=sym; openCard(card,false);
+}
+
+function openCard(card, silent){
+  card.classList.add("open");
+  const sym=card.dataset.sym;
+  loadAnalyst(card,sym);
+  loadEmpirical(card,sym);
+  loadSmartMoney(card,sym);
+  initTV(card,sym);
+}
+
+const smCache={};
+function loadSmartMoney(card,sym){
+  const sec=card.querySelector(".sm-section"), slot=card.querySelector(".sm-slot");
+  if(!slot) return;
+  const done=(d)=>{
+    if(!d || !d.available){ sec.style.display="none"; return; }
+    sec.style.display="";
+    const trades=(d.trades||[]).map(t=>`<div class="smtrade"><span><span class="${t.side==='buy'?'b':'s'}">${t.side.toUpperCase()}</span> ${t.name||'—'}</span><span>${t.amount||''} · ${t.transaction_date||''}${t.lag_days!=null?` · disclosed ${t.lag_days}d later`:''}</span></div>`).join("");
+    slot.innerHTML=`<div class="meta" style="color:var(--dim);font-size:11px;margin-bottom:6px">Net ${d.net>=0?'+':''}${d.net} (${d.buys} buys / ${d.sells} sells, ${d.lookback_days}d)</div>${trades||'<span class="loading">no disclosed trades in window</span>'}<div class="caveat" style="margin-top:8px">⚠ ${d.caveat||''}</div>`;
+  };
+  if(smCache[sym]){ done(smCache[sym]); return; }
+  sec.style.display="none";
+  fetch(API+"/api/smartmoney/"+sym).then(r=>r.json()).then(d=>{ smCache[sym]=d; if(openSym===sym) done(d); }).catch(()=>{ sec.style.display="none"; });
+}
+
+function initTV(card,sym){
+  const slot=card.querySelector(".tv-slot");
+  if(!slot || slot.dataset.loaded) return;
+  slot.dataset.loaded="1";
+  slot.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+  const s=document.createElement("script");
+  s.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+  s.async=true;
+  s.innerHTML=JSON.stringify({symbol:sym,interval:"D",theme:"dark",style:"1",locale:"en",autosize:true,hide_top_toolbar:false,allow_symbol_change:false});
+  slot.querySelector(".tradingview-widget-container").appendChild(s);
+}
+
+function loadAnalyst(card,sym){
+  const slot=card.querySelector(".analyst-slot");
+  if(!slot) return;
+  if(analystCache[sym]){ slot.innerHTML=analystHTML(analystCache[sym]); return; }
+  slot.innerHTML=`<span class="loading">writing analyst note…</span>`;
+  fetch(API+"/api/analyst/"+sym).then(r=>r.json()).then(d=>{
+    analystCache[sym]=d;
+    if(openSym===sym) slot.innerHTML=analystHTML(d);
+  }).catch(()=>{ slot.innerHTML=`<div class="errbox">Could not reach the analyst service.</div>`; });
+}
+function analystHTML(d){
+  if(!d.available) return `<div class="loading">${d.reason||"analyst notes disabled"}</div>`;
+  const cav=(d.caveats||[]).map(c=>`<div class="caveat">⚠ ${c}</div>`).join("");
+  const flag=d.flagged?`<div class="caveat">⚠ A figure in this note could not be matched to the source stats and may be unreliable.</div>`:"";
+  const news=(d.news||[]).length?`<div class="news">${d.news.map(n=>`<a href="${n.url}" target="_blank" rel="noopener">${n.title} — <span class="flat">${n.publisher}</span></a>`).join("")}</div>`:"";
+  return `<div class="analyst">${d.note||""}</div>${cav}${flag}${news}`;
+}
+
+function loadEmpirical(card,sym){
+  const slot=card.querySelector(".empirical-slot");
+  if(!slot) return;
+  if(likeCache[sym]){ slot.innerHTML=empHTML(likeCache[sym]); return; }
+  slot.innerHTML=`<span class="loading">computing from real history…</span>`;
+  fetch(API+"/api/likelihood/"+sym).then(r=>r.json()).then(d=>{
+    likeCache[sym]=d;
+    if(openSym===sym) slot.innerHTML=empHTML(d);
+  }).catch(()=>{ slot.innerHTML=`<div class="errbox">History service unavailable.</div>`; });
+}
+function empHTML(d){
+  if(d.error) return `<div class="errbox">No real history yet.<br>${d.error}</div>`;
+  if(!d.n) return `<div class="errbox">No comparable historical setups for ${d.symbol}. Nothing to report honestly.</div>`;
+  const thin=d.n<12;
+  return `<div class="panel">
+    <div><div class="lbl">Hit +${d.target_pct}% in ${d.horizon_days}d</div><div class="big ${d.freq_target>=20?'rise':''}">${fmtPct(d.freq_target)}</div><div class="meta ${thin?'warn':''}">n = ${d.n}${thin?' · thin, treat as noise':''}</div></div>
+    <div><div class="lbl">Median forward return</div><div class="big ${d.median_fwd>0?'rise':d.median_fwd<0?'fall':''}">${d.median_fwd>0?'+':''}${d.median_fwd}%</div><div class="meta">25th–75th: ${d.p25_fwd}% to ${d.p75_fwd}%</div></div>
+    <div><div class="lbl">Round-trip to entry (≤3wk)</div><div class="big">${fmtPct(d.recover_rate)}</div><div class="meta">of cases that first dropped below entry</div></div>
+    <div class="full"><b>What this is:</b> across ${d.n} past days where ${d.symbol} looked like it does now, this is what actually happened — an empirical frequency, not a forecast. The model estimate above is checked against this.</div>
+  </div>`;
+}
+
+function openTrust(){
+  const m=document.getElementById("trustModal"), box=document.getElementById("trustBox");
+  let h=`<span class="mclose" onclick="closeTrust()">close ✕</span><h3>Model trust</h3>`;
+  if(!calib || !calib.available){ h+=`<p class="loading" style="margin-top:10px">No model artifact loaded — the leaderboard is ranking by the activity score.</p>`; }
+  else{
+    const v=calib.validation||{}; const pop=v.pop||{}, safe=v.safe||{};
+    h+=`<p class="meta" style="color:var(--dim);font-size:12px;margin:6px 0 12px;line-height:1.5">Version <b style="color:var(--ink)">${calib.model_version||'–'}</b>${calib.synthetic?' · <span style="color:var(--warn)">synthetic data</span>':''} · ${calib.trustworthy?'<span style="color:var(--rise)">display-validated</span>':'<span style="color:var(--warn)">below display threshold</span>'}</p>`;
+    h+=`<table class="reltable"><tr><th>head</th><th>n</th><th>base rate</th><th>Brier</th><th>AP</th><th>prec@5</th></tr>`;
+    [["pop",pop],["safe",safe]].forEach(([k,m2])=>{
+      h+=`<tr><td style="text-align:left;color:var(--ink)">${k}</td><td>${m2.n||'–'}</td><td>${m2.base_rate!=null?(m2.base_rate*100).toFixed(1)+'%':'–'}</td><td>${m2.brier??'–'}</td><td>${m2.average_precision??'–'}</td><td>${m2.precision_at_k?(m2.precision_at_k['5']??'–'):'–'}</td></tr>`;
+    });
+    h+=`</table>`;
+    if(pop.reliability&&pop.reliability.length){
+      h+=`<h3 style="font-size:13px;margin-top:16px">Reliability — P(pop) predicted vs observed</h3><table class="reltable"><tr><th>bin</th><th>predicted</th><th>observed</th><th>n</th></tr>`;
+      pop.reliability.forEach(b=>{ h+=`<tr><td style="text-align:left">${b.bin}</td><td>${(b.predicted*100).toFixed(1)}%</td><td>${(b.observed*100).toFixed(1)}%</td><td>${b.n}</td></tr>`; });
+      h+=`</table>`;
+    }
+    if(calib.feature_skew_note) h+=`<p class="meta" style="color:var(--faint);font-size:11px;margin-top:14px;line-height:1.5">${calib.feature_skew_note}</p>`;
+  }
+  box.innerHTML=h; m.classList.add("show");
+}
+function closeTrust(){ document.getElementById("trustModal").classList.remove("show"); }
+
+function connect(){
+  let ws;
+  try{ ws=new WebSocket(WS); }catch(e){ return poll(); }
+  ws.onopen=()=>{ $dot.classList.add("on"); $conn.textContent="live"; };
+  ws.onmessage=ev=>{ const d=JSON.parse(ev.data); render(d.rows,d); };
+  ws.onclose=()=>{ $dot.classList.remove("on"); $conn.textContent="reconnecting"; setTimeout(connect,2000); };
+  ws.onerror=()=>{ ws.close(); };
+}
+async function poll(){
+  $conn.textContent="polling";
+  try{ const d=await(await fetch(API+"/api/leaderboard")).json(); $dot.classList.add("on"); render(d.rows,d); }
+  catch(e){ $dot.classList.remove("on"); $conn.textContent="offline"; }
+  setTimeout(poll,3000);
+}
+
+// ----- paper portfolio drawer -----
+let drawerOpen=false;
+function toggleDrawer(){ drawerOpen?closeDrawer():openDrawer(); }
+function openDrawer(){ drawerOpen=true; document.getElementById("drawer").classList.add("show"); loadPortfolio(); }
+function closeDrawer(){ drawerOpen=false; document.getElementById("drawer").classList.remove("show"); }
+
+async function loadPortfolio(){
+  let d;
+  try{ d=await(await fetch(API+"/api/paper/portfolio")).json(); }catch(e){ return; }
+  // header button always reflects equity
+  const btn=document.getElementById("paperBtn");
+  if(btn){ btn.textContent="paper $"+Math.round(d.equity).toLocaleString(); btn.style.color = d.return_pct>=0?"var(--rise)":"var(--fall)"; }
+  if(!drawerOpen) return;
+  const body=document.getElementById("drawerBody");
+  const rc = d.return_pct>=0?"rise":"fall";
+  const open=(d.open_positions||[]).map(p=>`<tr><td class="l">${p.symbol}</td><td>$${p.entry_price}</td><td>$${p.last}</td><td class="${p.unrealized_pnl>=0?'rise':'fall'}">${p.unrealized_pnl>=0?'+':''}${p.unrealized_pct}%</td><td>${p.dist_to_target_pct}% / -${p.dist_to_stop_pct}%</td><td><span class="pclose" onclick="closePos('${p.symbol}')">close</span></td></tr>`).join("");
+  const closed=(d.closed_trades||[]).slice().reverse().map(t=>`<tr><td class="l">${t.symbol}</td><td>$${t.entry_price}→$${t.exit_price}</td><td class="${t.pnl>=0?'rise':'fall'}">${t.pnl>=0?'+':''}$${t.pnl}</td><td class="${t.pnl>=0?'rise':'fall'}">${t.pnl_pct}%</td><td>${t.reason}</td></tr>`).join("");
+  body.innerHTML=`
+    <div class="simbadge">SIMULATED — fills modeled vs live prices at last trade ± ${d.slippage_bps}bps slippage. Not a brokerage; this is forward-validation of the model, not real trading.</div>
+    <div class="pstat"><span>Equity</span><b>$${d.equity.toLocaleString()}</b></div>
+    <div class="pstat"><span>Total return</span><b class="${rc}">${d.return_pct>=0?'+':''}${d.return_pct}%</b></div>
+    <div class="pstat"><span>Cash</span><b>$${d.cash.toLocaleString()}</b></div>
+    <div class="pstat"><span>Realized P&L</span><b class="${d.realized_pnl>=0?'rise':'fall'}">${d.realized_pnl>=0?'+':''}$${d.realized_pnl}</b></div>
+    <div class="pstat"><span>Unrealized P&L</span><b class="${d.unrealized_pnl>=0?'rise':'fall'}">${d.unrealized_pnl>=0?'+':''}$${d.unrealized_pnl}</b></div>
+    <div class="pstat"><span>Win rate (n=${d.n_closed})</span><b>${d.win_rate!=null?d.win_rate+'%':'–'}</b></div>
+    <h3 style="font-size:12px;margin-top:16px;color:var(--faint)">Open positions</h3>
+    ${open?`<table class="ptable"><tr><th class="l">sym</th><th>entry</th><th>last</th><th>unrl</th><th>tgt/stop</th><th></th></tr>${open}</table>`:'<p class="loading">none open — arm a pick from the leaderboard</p>'}
+    <h3 style="font-size:12px;margin-top:16px;color:var(--faint)">Closed trades</h3>
+    ${closed?`<table class="ptable"><tr><th class="l">sym</th><th>entry→exit</th><th>P&L</th><th>%</th><th>why</th></tr>${closed}</table>`:'<p class="loading">none yet</p>'}
+    <p style="margin-top:16px"><span class="pclose" onclick="resetPaper()" style="color:var(--faint)">reset paper account</span></p>`;
+}
+async function closePos(sym){ try{ await fetch(API+"/api/paper/close/"+sym,{method:"POST"}); loadPortfolio(); }catch(e){} }
+async function resetPaper(){ if(!confirm("Reset the paper account to starting cash?"))return; try{ await fetch(API+"/api/paper/reset",{method:"POST"}); loadPortfolio(); }catch(e){} }
+
+loadCalibration();
+setInterval(loadCalibration, 60000);
+loadPortfolio();
+setInterval(loadPortfolio, 5000);
+connect();
+</script>
+</body>
+</html>

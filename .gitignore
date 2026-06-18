@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+backend/.env
+.hist_cache/
+.DS_Store
+
+# model artifacts & caches
+.model/
+backend/.model/
+*.joblib
+*_report.json
+.universe_cache/
+.dataset_cache/
+.news_cache/
+.altdata_cache/
+.paper/
+backend/.hist_cache/
+backend/.universe_cache/
+backend/.dataset_cache/
+backend/.news_cache/
+backend/.altdata_cache/
+backend/.paper/

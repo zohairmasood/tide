@@ -1,0 +1,25 @@
+# Render blueprint — one-click deploy of the live Tide backend + wired dashboard.
+# https://render.com → New → Blueprint → point at this repo. Free tier works.
+# After deploy, set the secret env vars (ANTHROPIC_API_KEY, POLYGON_API_KEY) in
+# the Render dashboard, and optionally flip DATA_PROVIDER to "polygon".
+services:
+  - type: web
+    name: tide
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATA_PROVIDER
+        value: mock          # change to "polygon" once POLYGON_API_KEY is set
+      - key: TOP_N
+        value: "5"
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set in dashboard (enables analyst notes)
+      - key: POLYGON_API_KEY
+        sync: false          # set in dashboard (enables real data)
+      - key: ANALYST_MODEL
+        value: claude-opus-4-8

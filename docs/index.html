@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tide · Opportunity Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#F4F3EF;font-family:'Schibsted Grotesk',system-ui,sans-serif;color:#17171C;-webkit-font-smoothing:antialiased}
+  button,select,input{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#d9d7cf;border-radius:6px;border:2px solid #F4F3EF}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes tidepulse{0%{box-shadow:0 0 0 0 rgba(22,128,143,.5)}70%{box-shadow:0 0 0 5px rgba(22,128,143,0)}100%{box-shadow:0 0 0 0 rgba(22,128,143,0)}}
+  @keyframes toastin{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+"use strict";
+// ============================================================================
+// Tide — static snapshot of the Claude Design prototype.
+// Ported from Tide.dc.html (Claude Design / DCLogic) to dependency-free vanilla
+// JS so it runs as a static GitHub Pages site. Market data here is SIMULATED —
+// the live calibrated model, paper trading, and analyst notes run in the full
+// app (the FastAPI backend). Conviction / target / floor are illustrative.
+// ============================================================================
+const ACCENT = '#16808F';
+const ACCENT_SOFT = '#E2EFF1';
+const THRESHOLD = 60;
+
+const state = {
+  view: 'scanner', filter: 'qualified', sortKey: 'score', selectedId: null,
+  watch: ['NVDA', 'CLSK'], alerts: [], toasts: [], paused: false,
+  stocks: null, indices: null, tick: 0, clock: '',
+  form: { stock: 'NVDA', type: 'priceBelow', value: '' },
+};
+
+// ---- helpers ----
+const rnd = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const fp = p => '$' + p.toFixed(2);
+const fpct = x => (x >= 0 ? '+' : '') + x.toFixed(2) + '%';
+const dirColor = x => x >= 0 ? '#11A06B' : '#E0504F';
+const convColor = c => c >= 75 ? '#0E8C5A' : c >= 60 ? '#16808F' : c >= 45 ? '#C98A1E' : '#A0A0A8';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function hashColors(t) {
+  const pal = [['#E3F0F2', '#0E6B78'], ['#EAE6F8', '#5B43B5'], ['#E7F2E8', '#1F7A45'], ['#FBEAE3', '#B5552B'], ['#E5EEFA', '#27518F'], ['#F7E9F0', '#9E3267'], ['#FCF1DC', '#9A6B12'], ['#E6F1F6', '#2A6E8E']];
+  let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % pal.length;
+  return pal[h];
+}
+function genCandles(end, vol) {
+  const n = 34, arr = []; let p = end * (1 - (Math.random() * 0.07 - 0.015));
+  for (let i = 0; i < n; i++) {
+    const o = p, drift = (end - p) / (n - i) * 0.65;
+    let c = Math.max(0.6, o + o * (rnd() * vol * 0.7) + drift);
+    const h = Math.max(o, c) * (1 + Math.random() * vol * 0.5);
+    const l = Math.min(o, c) * (1 - Math.random() * vol * 0.5);
+    arr.push({ o, h, l, c }); p = c;
+  }
+  arr[n - 1].c = end; arr[n - 1].h = Math.max(arr[n - 1].h, end); arr[n - 1].l = Math.min(arr[n - 1].l, end);
+  return arr;
+}
+function seed() {
+  const base = [
+    ['NVDA', 'Nvidia Corp.', 'Semiconductors', 121.4, 0.026, 74, 12.8, 69],
+    ['CLSK', 'CleanSpark Inc.', 'Crypto Mining', 11.7, 0.052, 71, 16.5, 58],
+    ['PLTR', 'Palantir Tech.', 'Software', 38.2, 0.034, 68, 13.4, 62],
+    ['SMCI', 'Super Micro', 'Hardware', 44.9, 0.045, 66, 15.1, 55],
+    ['RIVN', 'Rivian Auto.', 'EV', 13.6, 0.041, 64, 14.2, 60],
+    ['SOFI', 'SoFi Tech.', 'Fintech', 9.8, 0.036, 63, 12.1, 64],
+    ['MARA', 'Marathon Dig.', 'Crypto Mining', 18.3, 0.05, 62, 17.8, 51],
+    ['AFRM', 'Affirm Hldgs.', 'Fintech', 41.2, 0.043, 61, 13.9, 57],
+    ['DKNG', 'DraftKings', 'Gaming', 39.7, 0.033, 60, 11.6, 66],
+    ['COIN', 'Coinbase', 'Crypto Exch.', 212.5, 0.04, 59, 12.7, 63],
+    ['ROKU', 'Roku Inc.', 'Media', 62.1, 0.037, 57, 11.9, 59],
+    ['UPST', 'Upstart Hldgs.', 'Fintech', 54.3, 0.048, 55, 16.2, 48],
+    ['ENPH', 'Enphase Energy', 'Solar', 71.8, 0.035, 52, 12.4, 61],
+    ['PYPL', 'PayPal Hldgs.', 'Fintech', 67.4, 0.024, 48, 9.8, 70],
+    ['F', 'Ford Motor', 'Auto', 11.2, 0.022, 44, 8.6, 72],
+    ['INTC', 'Intel Corp.', 'Semiconductors', 22.6, 0.027, 41, 9.1, 67],
+  ];
+  return base.map(b => {
+    const [ticker, name, sector, price, vol, conv, target, floor] = b;
+    const candles = genCandles(price, vol), hist = candles.map(c => c.c);
+    return {
+      id: ticker, ticker, name, sector, vol, price, dayOpen: hist[0],
+      conv, baseConv: conv, target, baseTarget: target, floor, baseFloor: floor,
+      score: Math.round(conv * 0.5 + floor * 0.32 + Math.min(target, 20) * 0.9),
+      dir: 0, candles, hist,
+      rsi: 48 + Math.round(Math.random() * 22), volx: (1 + Math.random() * 2.4), support: (1 + Math.random() * 3.5),
+    };
+  });
+}
+function spark(hist, W, H) {
+  const lo = Math.min(...hist), hi = Math.max(...hist), r = hi - lo || 1;
+  return hist.map((p, i) => (i / (hist.length - 1) * W).toFixed(1) + ',' + (H - 3 - (p - lo) / r * (H - 6)).toFixed(1)).join(' ');
+}
+function condText(a) {
+  if (a.type === 'priceAbove') return 'Price above ' + fp(a.value);
+  if (a.type === 'priceBelow') return 'Price at/below ' + fp(a.value);
+  return 'Conviction above ' + Math.round(a.value) + '%';
+}
+function rankedAll() {
+  const k = state.sortKey;
+  const key = s => k === 'conviction' ? s.conv : k === 'target' ? s.target : k === 'floor' ? s.floor : s.score;
+  return [...state.stocks].sort((a, b) => key(b) - key(a));
+}
+function featured() {
+  if (!state.stocks) return null;
+  const f = state.selectedId && state.stocks.find(s => s.id === state.selectedId);
+  return f || [...state.stocks].sort((a, b) => b.score - a.score)[0];
+}
+
+// ---- simulation tick ----
+function step() {
+  if (state.paused || !state.stocks) return;
+  state.stocks = state.stocks.map(s => {
+    const last = s.candles[s.candles.length - 1];
+    const np = Math.max(0.5, s.price * (1 + rnd() * s.vol * 0.42));
+    last.c = np; last.h = Math.max(last.h, np); last.l = Math.min(last.l, np);
+    let candles = s.candles;
+    if (state.tick % 5 === 4) candles = [...s.candles.slice(1), { o: np, h: np, l: np, c: np }];
+    const hist = [...s.hist.slice(1), np];
+    const conv = clamp(s.conv + rnd() * 1.6, Math.max(5, s.baseConv - 9), Math.min(94, s.baseConv + 9));
+    const target = clamp(s.target + rnd() * 0.25, s.baseTarget - 2, s.baseTarget + 2);
+    const floor = clamp(s.floor + rnd() * 1.1, s.baseFloor - 7, s.baseFloor + 7);
+    const score = Math.round(conv * 0.5 + floor * 0.32 + Math.min(target, 20) * 0.9);
+    return { ...s, price: np, dir: Math.sign(np - s.price), candles, hist, conv, target, floor, score };
+  });
+  const idx = { ...state.indices }; for (const k in idx) idx[k] = idx[k] * (1 + rnd() * 0.0009); state.indices = idx;
+  // alerts
+  const fired = [];
+  if (state.alerts.length) {
+    state.alerts = state.alerts.map(al => {
+      if (!al.armed || al.triggered) return al;
+      const st = state.stocks.find(x => x.id === al.stock); if (!st) return al;
+      let hit = false;
+      if (al.type === 'priceAbove') hit = st.price >= al.value;
+      else if (al.type === 'priceBelow') hit = st.price <= al.value;
+      else if (al.type === 'convAbove') hit = st.conv >= al.value;
+      if (hit) { fired.push({ ...al, px: st.price }); return { ...al, triggered: true, at: Date.now() }; }
+      return al;
+    });
+  }
+  if (fired.length) {
+    const ts = fired.map(f => ({ id: 'to' + Math.random(), color: ACCENT, title: f.stock + ' alert triggered', body: condText(f) + ' — now ' + fp(f.px) }));
+    state.toasts = [...ts, ...state.toasts].slice(0, 4);
+    ts.forEach(t => setTimeout(() => { state.toasts = state.toasts.filter(x => x.id !== t.id); renderToasts(); }, 5200));
+    renderToasts();
+  }
+  state.tick++;
+}
+
+// ---- candle canvas ----
+function draw() {
+  const cv = document.getElementById('candle'); if (!cv) return;
+  const f = featured(); if (!f) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 600, h = cv.clientHeight || 230;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const padL = 6, padR = 56, padT = 12, padB = 20, cs = f.candles, n = cs.length;
+  let lo = Infinity, hi = -Infinity; cs.forEach(c => { lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); });
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const Y = p => padT + (hi - p) / (hi - lo) * (h - padT - padB);
+  const cw = (w - padL - padR) / n;
+  ctx.font = "10px 'JetBrains Mono', monospace"; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 4; i++) {
+    const p = lo + (hi - lo) * i / 4, y = Y(p);
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillStyle = '#A9A8A0'; ctx.textAlign = 'left'; ctx.fillText('$' + p.toFixed(p < 30 ? 1 : 0), w - padR + 6, y);
+  }
+  cs.forEach((c, i) => {
+    const x = padL + i * cw + cw / 2, up = c.c >= c.o;
+    ctx.strokeStyle = up ? '#11A06B' : '#E0504F'; ctx.fillStyle = up ? '#11A06B' : '#E0504F';
+    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, Y(c.h)); ctx.lineTo(x, Y(c.l)); ctx.stroke();
+    const bw = Math.max(2, cw * 0.62), yo = Y(c.o), yc = Y(c.c);
+    ctx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1.5, Math.abs(yc - yo)));
+  });
+  const last = cs[n - 1].c, yl = Y(last);
+  ctx.strokeStyle = 'rgba(22,128,143,0.55)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, yl); ctx.lineTo(w - padR, yl); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = ACCENT; ctx.fillRect(w - padR, yl - 8, padR, 16);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText('$' + last.toFixed(last < 30 ? 2 : 1), w - padR + 5, yl);
+}
+
+// ============================ rendering ============================
+function headerHTML() {
+  const nav = (v, label, badge) => {
+    const on = state.view === v;
+    return `<button data-act="go" data-v="${v}" style="border:none;cursor:pointer;font-size:13px;font-weight:600;padding:7px 15px;border-radius:8px;background:${on ? '#fff' : 'transparent'};color:${on ? '#17171C' : '#7A7982'};box-shadow:${on ? '0 1px 2px rgba(0,0,0,.08)' : 'none'};display:flex;align-items:center;gap:6px">${label}${badge || ''}</button>`;
+  };
+  const triggered = state.alerts.filter(a => a.triggered).length;
+  const badge = triggered ? `<span style="background:#E0504F;color:#fff;font-size:10px;font-weight:700;border-radius:20px;padding:1px 6px;font-family:'JetBrains Mono',monospace">${triggered}</span>` : '';
+  return `
+  <header style="position:sticky;top:0;z-index:40;background:rgba(244,243,239,.88);backdrop-filter:blur(12px);border-bottom:1px solid #E4E2DA">
+    <div style="max-width:1340px;margin:0 auto;padding:0 28px;height:62px;display:flex;align-items:center;gap:26px">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:31px;height:31px;border-radius:9px;background:${ACCENT};display:flex;align-items:center;justify-content:center">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M2 14c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 19c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg>
+        </div>
+        <div style="font-weight:800;font-size:19px;letter-spacing:-.03em">Tide</div>
+      </div>
+      <nav style="display:flex;gap:3px;background:#ECEAE2;padding:4px;border-radius:11px">
+        ${nav('scanner', 'Scanner')}${nav('watch', 'Watchlist')}${nav('alerts', 'Alerts', badge)}
+      </nav>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#5C5B64;font-weight:500">
+        <span id="liveDot" style="width:8px;height:8px;border-radius:50%;background:${state.paused ? '#B7B6AE' : '#11A06B'};animation:${state.paused ? 'none' : 'tidepulse 2s infinite'}"></span>
+        <span id="clock" style="font-family:'JetBrains Mono',monospace;letter-spacing:-.01em">${state.clock}</span>
+      </div>
+      <button data-act="pause" title="Play / pause feed" style="width:34px;height:34px;border-radius:9px;border:1px solid #E0DED5;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#43424A;font-size:12px">${state.paused ? '►' : '❚❚'}</button>
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#22323a,#4a6b74);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">AD</div>
+    </div>
+    <div style="border-top:1px solid #ECEAE2;background:#FAF9F6">
+      <div id="tickerStrip" style="max-width:1340px;margin:0 auto;padding:9px 28px;display:flex;align-items:center;gap:26px;overflow-x:auto">${tickerHTML()}</div>
+    </div>
+  </header>`;
+}
+function tickerHTML() {
+  if (!state.indices) return '';
+  const items = [
+    { sym: 'S&P 500', v: state.indices.SPX, base: 5489.2 }, { sym: 'NASDAQ', v: state.indices.NDX, base: 19211.5 },
+    { sym: 'VIX', v: state.indices.VIX, base: 14.8 }, { sym: 'BTC', v: state.indices.BTC, base: 67240 },
+  ];
+  return items.map(t => {
+    const ch = (t.v - t.base) / t.base * 100;
+    const price = t.v >= 1000 ? t.v.toLocaleString('en-US', { maximumFractionDigits: 0 }) : t.v.toFixed(2);
+    return `<div style="display:flex;align-items:baseline;gap:8px;white-space:nowrap;flex:none">
+      <span style="font-size:12px;font-weight:700;letter-spacing:.02em;color:#3A3942">${t.sym}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500">${price}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${dirColor(ch)}">${fpct(ch)}</span>
+    </div>`;
+  }).join('');
+}
+
+function scannerHTML() {
+  const all = rankedAll();
+  const filtered = state.filter === 'qualified' ? all.filter(s => s.conv >= THRESHOLD) : all;
+  const qualified = all.filter(s => s.conv >= THRESHOLD).length;
+  const f = featured();
+  const hc = k => state.sortKey === k ? ACCENT : '#9C9CA6';
+
+  const rows = filtered.map((s, i) => {
+    const ch = (s.price - s.dayOpen) / s.dayOpen * 100;
+    const [bg, fg] = hashColors(s.ticker);
+    const watched = state.watch.includes(s.id), qual = s.conv >= THRESHOLD, top3 = i < 3;
+    return `<tr data-act="select" data-id="${s.id}" style="border-top:1px solid #F1EFE8;cursor:pointer;background:${f && f.id === s.id ? ACCENT_SOFT : 'transparent'}">
+      <td style="padding:13px 12px 13px 20px"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;background:${top3 ? ACCENT_SOFT : '#F1EFE8'};color:${top3 ? ACCENT : '#8B8A93'}">${i + 1}</span></td>
+      <td style="padding:13px 12px"><div style="display:flex;align-items:center;gap:10px">
+        <div style="width:30px;height:30px;border-radius:8px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">${s.ticker.slice(0, 2)}</div>
+        <div><div style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">${s.ticker}</div><div style="font-size:11.5px;color:#9C9CA6">${s.sector}</div></div>
+      </div></td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:${dirColor(s.dir || ch)}">${fp(s.price)}</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${dirColor(ch)}">${fpct(ch)}</td>
+      <td style="padding:13px 12px"><div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:6px;background:#F0EEE7;border-radius:4px;overflow:hidden;min-width:64px"><div style="height:100%;border-radius:4px;width:${Math.round(s.conv)}%;background:${convColor(s.conv)}"></div></div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:${convColor(s.conv)};min-width:34px">${Math.round(s.conv)}%</span>
+        <span style="font-size:11px;color:#11A06B">${qual ? '✓' : ''}</span>
+      </div></td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#11A06B">${fpct(s.target)}</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${s.floor >= 60 ? '#11A06B' : s.floor >= 45 ? '#C98A1E' : '#A0A0A8'}">${Math.round(s.floor)}%</td>
+      <td style="padding:13px 12px;text-align:center"><svg width="78" height="26" viewBox="0 0 78 26" preserveAspectRatio="none" style="display:block;margin:0 auto"><polyline points="${spark(s.hist, 78, 26)}" fill="none" stroke="${ch >= 0 ? '#11A06B' : '#E0504F'}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></td>
+      <td style="padding:13px 12px;text-align:right"><span style="display:inline-block;min-width:34px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${s.score >= 60 ? '#fff' : '#5C5B64'};background:${s.score >= 60 ? ACCENT : '#EEECE5'};padding:3px 8px;border-radius:7px">${s.score}</span></td>
+      <td style="padding:13px 20px 13px 12px;text-align:right"><button data-act="watch" data-id="${s.id}" title="Toggle watchlist" style="border:none;background:none;cursor:pointer;font-size:16px;color:${watched ? '#E0A92E' : '#C9C7C0'};padding:2px">${watched ? '★' : '☆'}</button></td>
+    </tr>`;
+  }).join('');
+
+  const fch = (f.price - f.dayOpen) / f.dayOpen * 100;
+  const [fbg, ffg] = hashColors(f.ticker), fwatched = state.watch.includes(f.id);
+  const gauges = [
+    { label: 'Upside conviction', val: Math.round(f.conv) + '%', vc: convColor(f.conv), pct: Math.round(f.conv), color: convColor(f.conv), detail: 'P(+10% within 24–48h). Threshold to qualify: ' + THRESHOLD + '%.' },
+    { label: 'Projected target', val: fpct(f.target), vc: '#11A06B', pct: Math.min(100, f.target * 5), color: '#11A06B', detail: 'Modeled move to first resistance band.' },
+    { label: 'Downside floor', val: Math.round(f.floor) + '%', vc: f.floor >= 60 ? '#11A06B' : '#C98A1E', pct: Math.round(f.floor), color: f.floor >= 60 ? '#11A06B' : '#C98A1E', detail: 'Confidence price recovers to entry within ~3 weeks.' },
+  ].map(g => `<div style="margin-bottom:15px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:12.5px;font-weight:600;color:#43424A">${g.label}</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${g.vc}">${g.val}</span></div>
+      <div style="height:7px;background:#F0EEE7;border-radius:5px;overflow:hidden"><div style="height:100%;border-radius:5px;width:${g.pct}%;background:${g.color}"></div></div>
+      <div style="font-size:11px;color:#9C9CA6;margin-top:5px;line-height:1.4">${g.detail}</div>
+    </div>`).join('');
+  const factors = [
+    { label: 'Momentum (RSI)', val: f.rsi, color: f.rsi >= 55 ? '#11A06B' : '#C98A1E' },
+    { label: 'Volume surge', val: f.volx.toFixed(1) + '×', color: f.volx >= 1.8 ? '#11A06B' : '#A0A0A8' },
+    { label: 'Distance to support', val: f.support.toFixed(1) + '%', color: f.support <= 2 ? '#11A06B' : '#A0A0A8' },
+  ].map(x => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:${x.color}"></span><span style="font-size:12.5px;color:#43424A;flex:1">${x.label}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#6E6E78">${x.val}</span></div>`).join('');
+
+  const fbtn = (key, label, on) => `<button data-act="${key}" style="border:1px solid ${on ? ACCENT : '#E0DED5'};background:${on ? ACCENT : '#fff'};color:${on ? '#fff' : '#5C5B64'};font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer">${label}</button>`;
+
+  return `<div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${ACCENT};margin-bottom:5px">Real-time opportunity scan</div>
+        <h1 style="margin:0;font-size:27px;font-weight:800;letter-spacing:-.025em">Prospective Leaderboard</h1>
+        <p style="margin:6px 0 0;font-size:13.5px;color:#6E6E78;max-width:580px;line-height:1.5">Ranked by conviction of <strong style="color:#43424A">+10% inside 24–48h</strong>, weighted against downside-floor confidence that price recovers to entry within ~3 weeks.</p>
+      </div>
+      <div style="display:flex;gap:18px;align-items:center">
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${ACCENT};line-height:1">${qualified}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Qualified signals</div></div>
+        <div style="width:1px;height:38px;background:#E4E2DA"></div>
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1">${all.length}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Symbols scanned</div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:20px">
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="width:46px;height:46px;border-radius:12px;background:${fbg};color:${ffg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">${f.ticker.slice(0, 2)}</div>
+            <div>
+              <div style="display:flex;align-items:center;gap:9px"><span style="font-size:20px;font-weight:800;letter-spacing:-.02em">${f.ticker}</span><span style="font-size:11px;font-weight:600;color:#6E6E78;background:#F1EFE8;padding:3px 8px;border-radius:6px">${f.sector}</span><span style="font-size:11px;font-weight:700;color:#fff;background:${ACCENT};padding:3px 8px;border-radius:6px;letter-spacing:.02em">TOP SIGNAL</span></div>
+              <div style="font-size:13px;color:#8B8A93;margin-top:3px">${f.name}</div>
+            </div>
+          </div>
+          <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:700;line-height:1;color:${dirColor(f.dir || fch)}">${fp(f.price)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;margin-top:3px;color:${dirColor(fch)}">${fpct(fch)}</div></div>
+        </div>
+        <canvas id="candle" style="width:100%;height:230px;display:block"></canvas>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button data-act="watchF" style="flex:1;height:38px;border-radius:10px;border:1px solid ${fwatched ? ACCENT : '#E0DED5'};background:${fwatched ? ACCENT_SOFT : '#fff'};color:${fwatched ? ACCENT : '#3A3942'};font-weight:600;font-size:13px;cursor:pointer">${fwatched ? '★ On watchlist' : '☆ Add to watchlist'}</button>
+          <button data-act="alertF" style="flex:1;height:38px;border-radius:10px;border:1px solid #E0DED5;background:#fff;color:#3A3942;font-weight:600;font-size:13px;cursor:pointer">Set floor alert at entry</button>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);display:flex;flex-direction:column">
+        <div style="font-size:13px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px">Signal thesis</div>
+        <div style="font-size:12px;color:#8B8A93;margin-bottom:16px">Composite score <strong style="color:${ACCENT};font-family:'JetBrains Mono',monospace">${f.score}</strong> / 100</div>
+        ${gauges}
+        <div style="border-top:1px dashed #E4E2DA;margin:6px 0 13px"></div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9C9CA6;margin-bottom:9px">Why it ranked</div>
+        ${factors}
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #EEECE5;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:14px;font-weight:700">Live leaderboard</span><span style="font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT_SOFT};padding:3px 9px;border-radius:20px">${filtered.length} shown</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#8B8A93;font-weight:500;margin-right:2px">Filter</span>${fbtn('qual', '≥' + THRESHOLD + '% conviction', state.filter === 'qualified')}${fbtn('all', 'All symbols', state.filter === 'all')}</div>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:920px">
+        <thead><tr style="background:#FAF9F6">
+          <th style="text-align:left;padding:11px 12px 11px 20px;font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">#</th>
+          <th style="text-align:left;padding:11px 12px;font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">Symbol</th>
+          <th style="text-align:right;padding:11px 12px;font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">Price</th>
+          <th style="text-align:right;padding:11px 12px;font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">24h</th>
+          <th data-act="sort" data-k="conviction" style="text-align:left;padding:11px 12px;font-size:11px;font-weight:600;color:${hc('conviction')};letter-spacing:.04em;text-transform:uppercase;cursor:pointer;min-width:160px">Conviction ↓</th>
+          <th data-act="sort" data-k="target" style="text-align:right;padding:11px 12px;font-size:11px;font-weight:600;color:${hc('target')};letter-spacing:.04em;text-transform:uppercase;cursor:pointer">Target</th>
+          <th data-act="sort" data-k="floor" style="text-align:right;padding:11px 12px;font-size:11px;font-weight:600;color:${hc('floor')};letter-spacing:.04em;text-transform:uppercase;cursor:pointer">Floor</th>
+          <th style="text-align:center;padding:11px 12px;font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">7d</th>
+          <th data-act="sort" data-k="score" style="text-align:right;padding:11px 12px;font-size:11px;font-weight:600;color:${hc('score')};letter-spacing:.04em;text-transform:uppercase;cursor:pointer">Score</th>
+          <th style="padding:11px 20px 11px 12px"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+function watchHTML() {
+  const rows = state.watch.map(id => state.stocks.find(s => s.id === id)).filter(Boolean);
+  const empty = rows.length === 0;
+  const cards = rows.map(s => {
+    const ch = (s.price - s.dayOpen) / s.dayOpen * 100;
+    const [bg, fg] = hashColors(s.ticker);
+    const n = state.alerts.filter(a => a.stock === s.id).length;
+    return `<div style="background:#fff;border:1px solid #E8E6DF;border-radius:14px;padding:17px 18px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div data-act="selectGo" data-id="${s.id}" style="display:flex;gap:11px;align-items:center;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:9px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">${s.ticker.slice(0, 2)}</div>
+          <div><div style="font-size:15px;font-weight:800;letter-spacing:-.02em">${s.ticker}</div><div style="font-size:11.5px;color:#9C9CA6">${s.sector}</div></div>
+        </div>
+        <button data-act="unwatch" data-id="${s.id}" title="Remove" style="border:none;background:none;cursor:pointer;color:#BDBBB4;font-size:18px;line-height:1;padding:2px">×</button>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px">
+        <div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:${dirColor(s.dir || ch)}">${fp(s.price)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${dirColor(ch)}">${fpct(ch)}</div></div>
+        <svg width="92" height="34" viewBox="0 0 92 34" preserveAspectRatio="none"><polyline points="${spark(s.hist, 92, 34)}" fill="none" stroke="${ch >= 0 ? '#11A06B' : '#E0504F'}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:13px">
+        <div style="flex:1;background:#FAF9F6;border-radius:9px;padding:8px 10px"><div style="font-size:10px;color:#9C9CA6;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Conviction</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${convColor(s.conv)}">${Math.round(s.conv)}%</div></div>
+        <div style="flex:1;background:#FAF9F6;border-radius:9px;padding:8px 10px"><div style="font-size:10px;color:#9C9CA6;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Score</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700">${s.score}</div></div>
+      </div>
+      <button data-act="alertFor" data-id="${s.id}" style="width:100%;height:34px;border-radius:9px;border:1px solid #E0DED5;background:#fff;color:#3A3942;font-weight:600;font-size:12.5px;cursor:pointer">${n ? n + ' alert' + (n > 1 ? 's' : '') + ' armed · manage' : '+ Add alert'}</button>
+    </div>`;
+  }).join('');
+  return `<div>
+    <h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Watchlist</h1>
+    <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">${rows.length} symbol${rows.length === 1 ? '' : 's'} tracked — tap a card to open it in the scanner, or arm an alert.</p>
+    ${empty ? `<div style="background:#fff;border:1px dashed #DAD8D0;border-radius:16px;padding:54px;text-align:center;color:#9C9CA6"><div style="font-size:15px;font-weight:600;color:#6E6E78;margin-bottom:4px">No symbols watched yet</div><div style="font-size:13px">Star any row in the scanner to track it here.</div></div>` : ''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px">${cards}</div>
+  </div>`;
+}
+
+function alertsListHTML() {
+  if (!state.alerts.length) return `<div style="padding:48px;text-align:center;color:#9C9CA6"><div style="font-size:14px;font-weight:600;color:#6E6E78;margin-bottom:3px">No alerts yet</div><div style="font-size:13px">Create one with the panel on the right.</div></div>`;
+  return state.alerts.map((a, i) => {
+    const s = state.stocks.find(x => x.id === a.stock), [bg, fg] = hashColors(a.stock);
+    const statusFg = a.triggered ? '#fff' : a.armed ? '#0E6B78' : '#8B8A93';
+    const statusBg = a.triggered ? '#E0504F' : a.armed ? ACCENT_SOFT : '#EEECE5';
+    return `<div style="display:flex;align-items:center;gap:14px;padding:15px 18px;border-top:1px solid #F1EFE8;background:${a.triggered ? 'rgba(224,80,79,0.05)' : 'transparent'}">
+      <div style="width:38px;height:38px;border-radius:9px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${a.stock.slice(0, 2)}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700">${a.stock} <span style="font-weight:500;color:#8B8A93">${condText(a)}</span></div><div style="font-size:11.5px;color:#9C9CA6;margin-top:2px">${s ? 'Now ' + fp(s.price) + ' · conviction ' + Math.round(s.conv) + '%' : ''}</div></div>
+      <span style="font-size:11px;font-weight:700;color:${statusFg};background:${statusBg};padding:4px 10px;border-radius:20px">${a.triggered ? 'Triggered' : a.armed ? 'Armed' : 'Paused'}</span>
+      <button data-act="toggleAlert" data-i="${i}" style="border:1px solid #E0DED5;background:#fff;color:#5C5B64;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer">${a.armed ? 'Pause' : 'Arm'}</button>
+      <button data-act="removeAlert" data-i="${i}" title="Delete" style="border:none;background:none;cursor:pointer;color:#BDBBB4;font-size:18px;line-height:1">×</button>
+    </div>`;
+  }).join('');
+}
+function alertFormHTML() {
+  const all = rankedAll();
+  const opts = all.map(s => `<option value="${s.id}" ${s.id === state.form.stock ? 'selected' : ''}>${s.ticker} · ${esc(s.name)}</option>`).join('');
+  const ft = state.form.type;
+  const types = [['priceAbove', 'Price rises above'], ['priceBelow', 'Price falls to / below'], ['convAbove', 'Conviction rises above']]
+    .map(([v, l]) => `<option value="${v}" ${v === ft ? 'selected' : ''}>${l}</option>`).join('');
+  return `<div style="font-size:13.5px;font-weight:700;margin-bottom:14px">New alert</div>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;letter-spacing:.03em;text-transform:uppercase">Symbol</label>
+    <select data-act="formStock" style="width:100%;height:38px;margin:6px 0 13px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-size:13px;background:#fff;color:#17171C">${opts}</select>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;letter-spacing:.03em;text-transform:uppercase">Trigger</label>
+    <select data-act="formType" style="width:100%;height:38px;margin:6px 0 13px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-size:13px;background:#fff;color:#17171C">${types}</select>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;letter-spacing:.03em;text-transform:uppercase">${ft === 'convAbove' ? 'Conviction %' : 'Price ($)'}</label>
+    <input data-act="formValue" value="${state.form.value}" inputmode="decimal" style="width:100%;height:38px;margin:6px 0 16px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#17171C" />
+    <button data-act="addAlert" style="width:100%;height:40px;border:none;border-radius:10px;background:${ACCENT};color:#fff;font-weight:700;font-size:13.5px;cursor:pointer">Arm alert</button>`;
+}
+function alertsHTML() {
+  return `<div>
+    <h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Alerts</h1>
+    <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">Arm triggers on price, conviction, or downside floor. The live feed fires them automatically.</p>
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start">
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden"><div id="alertList">${alertsListHTML()}</div></div>
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:18px 19px;box-shadow:0 1px 2px rgba(0,0,0,.03)" id="alertForm">${alertFormHTML()}</div>
+    </div>
+  </div>`;
+}
+
+function footerHTML() {
+  return `<div style="max-width:1340px;margin:26px auto 0;font-size:11.5px;color:#A9A8A0;line-height:1.5">
+    Static snapshot with <strong>simulated</strong> market data — conviction, target and floor are illustrative model outputs, not investment advice.
+    The live version runs a calibrated model, simulated paper trading and Claude analyst notes against real market data (see the project README).
+  </div>`;
+}
+function renderToasts() {
+  let el = document.getElementById('toasts');
+  if (!el) { el = document.createElement('div'); el.id = 'toasts'; el.style.cssText = 'position:fixed;top:74px;right:22px;z-index:90;display:flex;flex-direction:column;gap:10px;width:300px'; document.body.appendChild(el); }
+  el.innerHTML = state.toasts.map(t => `<div style="background:#fff;border:1px solid #E8E6DF;border-left:3px solid ${t.color};border-radius:12px;padding:12px 14px;box-shadow:0 8px 24px rgba(20,20,20,.1);animation:toastin .25s ease"><div style="font-size:12.5px;font-weight:700;color:#17171C;margin-bottom:2px">${esc(t.title)}</div><div style="font-size:12px;color:#6E6E78;line-height:1.4">${esc(t.body)}</div></div>`).join('');
+}
+
+function viewHTML() {
+  if (state.view === 'watch') return watchHTML();
+  if (state.view === 'alerts') return alertsHTML();
+  return scannerHTML();
+}
+function renderShell() {
+  document.getElementById('app').innerHTML = headerHTML() +
+    `<main style="max-width:1340px;margin:0 auto;padding:26px 28px 60px"><div id="viewRoot">${viewHTML()}</div>${footerHTML()}</main>`;
+  if (state.view === 'scanner') draw();
+  renderToasts();
+}
+function renderView() {
+  const root = document.getElementById('viewRoot'); if (!root) return renderShell();
+  if (state.view === 'alerts') { const l = document.getElementById('alertList'); if (l) { l.innerHTML = alertsListHTML(); return; } }
+  root.innerHTML = viewHTML();
+  if (state.view === 'scanner') draw();
+}
+
+// ============================ events ============================
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const act = t.dataset.act, id = t.dataset.id;
+  const reshell = () => renderShell();
+  switch (act) {
+    case 'go': state.view = t.dataset.v; reshell(); break;
+    case 'pause': state.paused = !state.paused; reshell(); break;
+    case 'sort': state.sortKey = t.dataset.k; renderView(); break;
+    case 'qual': state.filter = 'qualified'; renderView(); break;
+    case 'all': state.filter = 'all'; renderView(); break;
+    case 'select': state.selectedId = id; renderView(); break;
+    case 'selectGo': state.view = 'scanner'; state.selectedId = id; reshell(); break;
+    case 'watch': e.stopPropagation(); toggleWatch(id); renderView(); break;
+    case 'watchF': { const f = featured(); toggleWatch(f.id); renderView(); break; }
+    case 'unwatch': toggleWatch(id); renderView(); break;
+    case 'alertF': { const f = featured(); state.view = 'alerts'; state.form = { stock: f.id, type: 'priceBelow', value: f.price.toFixed(2) }; reshell(); break; }
+    case 'alertFor': { const s = state.stocks.find(x => x.id === id); state.view = 'alerts'; state.form = { stock: id, type: 'priceBelow', value: s ? s.price.toFixed(2) : '' }; reshell(); break; }
+    case 'toggleAlert': { const i = +t.dataset.i; state.alerts = state.alerts.map((x, j) => j === i ? { ...x, armed: !x.armed, triggered: false } : x); renderView(); break; }
+    case 'removeAlert': { const i = +t.dataset.i; state.alerts = state.alerts.filter((_, j) => j !== i); renderView(); break; }
+    case 'addAlert': addAlert(); break;
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  if (t.dataset.act === 'formStock') state.form.stock = t.value;
+  else if (t.dataset.act === 'formType') { state.form.type = t.value; const fm = document.getElementById('alertForm'); if (fm) fm.innerHTML = alertFormHTML(); }
+});
+document.addEventListener('input', e => {
+  const t = e.target.closest('[data-act]'); if (t && t.dataset.act === 'formValue') state.form.value = t.value;
+});
+function toggleWatch(id) { state.watch = state.watch.includes(id) ? state.watch.filter(x => x !== id) : [...state.watch, id]; }
+function addAlert() {
+  const val = parseFloat(state.form.value);
+  if (!state.form.stock || isNaN(val)) return;
+  state.alerts = [...state.alerts, { stock: state.form.stock, type: state.form.type, value: val, armed: true, triggered: false }];
+  state.form.value = '';
+  renderShell();
+}
+
+// ============================ boot ============================
+state.stocks = seed();
+state.indices = { SPX: 5489.2, NDX: 19211.5, VIX: 14.8, BTC: 67240 };
+state.clock = new Date().toLocaleTimeString('en-US', { hour12: false });
+renderShell();
+setInterval(() => { step(); const ts = document.getElementById('tickerStrip'); if (ts) ts.innerHTML = tickerHTML(); renderView(); }, 1500);
+setInterval(() => {
+  state.clock = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const c = document.getElementById('clock'); if (c) c.textContent = state.clock;
+}, 1000);
+window.addEventListener('resize', () => { if (state.view === 'scanner') draw(); });
+</script>
+</body>
+</html>
