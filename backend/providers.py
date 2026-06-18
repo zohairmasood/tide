@@ -147,9 +147,15 @@ class PolygonProvider:
 
     def snapshot(self, symbols: list[str]) -> list[Snapshot]:
         url = f"{self.base}/v2/snapshot/locale/us/markets/stocks/tickers"
-        r = self._requests.get(url, params={"tickers": ",".join(symbols), "apiKey": self.key}, timeout=10)
-        r.raise_for_status()
-        data = r.json().get("tickers", [])
+        # batch the tickers param — a few thousand symbols in one query string
+        # exceeds URL length limits (414) and silently breaks the broad scan.
+        data = []
+        BATCH = 100
+        for i in range(0, len(symbols), BATCH):
+            chunk = symbols[i:i + BATCH]
+            r = self._requests.get(url, params={"tickers": ",".join(chunk), "apiKey": self.key}, timeout=15)
+            r.raise_for_status()
+            data.extend(r.json().get("tickers", []) or [])
         out: list[Snapshot] = []
         for t in data:
             day = t.get("day", {})
