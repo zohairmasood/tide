@@ -89,6 +89,19 @@ def _live_feats(symbol: str):
     return live_features(symbol, bars)
 
 
+def _enrich_sectors(rows):
+    """Fill real industry/sector on displayed rows (cached; no-op without a key)."""
+    for r in rows:
+        if r.get("sector") and r["sector"] != "Unknown":
+            continue
+        try:
+            m = _hist.ticker_meta(r["symbol"])
+        except Exception:  # noqa: BLE001
+            continue
+        if m.get("sector"):
+            r["sector"] = m["sector"]
+
+
 def _build_rows(snaps):
     """Return list of (Scored, row_dict, Prediction|None)."""
     scored = [score_snap(s) for s in snaps]
@@ -170,6 +183,9 @@ async def _refresh_loop():
             rows = await asyncio.to_thread(_build_rows, [s for s in snaps if s.symbol in poolset])
             top = _rank(rows, TOP_N, gate=True)
             payload_rows = [row for _, row, _ in top]
+            # replace "Unknown" sectors on the displayed rows with the real
+            # industry (cached; only the published top-N, so it's cheap).
+            await asyncio.to_thread(_enrich_sectors, payload_rows)
             # smart-money OVERLAY (top-N only, cached ~12h): a labeled side-signal +
             # tiebreak. Never alters the calibrated probability.
             if altdata.enabled():

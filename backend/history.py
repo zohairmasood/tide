@@ -161,6 +161,37 @@ class HistoryProvider:
             cache.write_text(json.dumps({k: asdict(v) for k, v in out.items()}))
         return out
 
+    def ticker_meta(self, symbol: str) -> dict:
+        """Company name + sector/industry for a ticker, from Polygon ticker
+        details (sic_description). Disk-cached ~30d (it rarely changes). Returns
+        {} without a key. Used to replace 'Unknown' sectors on displayed rows."""
+        d = CACHE_DIR / "meta"
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / f"{symbol.upper()}.json"
+        if p.exists() and (time.time() - p.stat().st_mtime < 60 * 60 * 24 * 30):
+            try:
+                return json.loads(p.read_text())
+            except Exception:
+                pass
+        if not self.key:
+            return {}
+        try:
+            body = self._request(f"{self.base}/v3/reference/tickers/{symbol.upper()}",
+                                 {"apiKey": self.key})
+            res = body.get("results", {}) or {}
+            sic = (res.get("sic_description") or "").strip()
+            meta = {"name": res.get("name", ""), "sector": sic.title() if sic else ""}
+        except Exception:  # noqa: BLE001
+            meta = {}
+        # only cache a successful lookup — never let a transient failure poison
+        # the 30-day cache and pin a ticker to "Unknown".
+        if meta.get("sector"):
+            try:
+                p.write_text(json.dumps(meta))
+            except Exception:
+                pass
+        return meta
+
     def reference_tickers(self, type_: str = "CS") -> list[dict]:
         """Active common-stock tickers (paged). Cached to disk (membership
         changes slowly). Returns the raw ticker dicts (ticker, name, primary_exchange,
