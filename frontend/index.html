@@ -53,7 +53,8 @@ const WS = API.replace(/^http/, "ws") + "/ws/leaderboard";
 const ACCENT = '#16808F', ACCENT_SOFT = '#E2EFF1', CONV_THRESHOLD = 60;
 
 const S = {
-  view: 'scanner', rows: [], payload: {}, calib: null, portfolio: null,
+  view: 'scanner', candidates: [], payload: {}, calib: null, portfolio: null,
+  tox: Math.min(100, Math.max(0, +(localStorage.getItem('tide.tox') || 45))),
   selectedId: null, watch: JSON.parse(localStorage.getItem('tide.watch') || '[]'),
   alerts: JSON.parse(localStorage.getItem('tide.alerts') || '[]'),
   toasts: [], clock: '', lastBySym: {},
@@ -61,6 +62,7 @@ const S = {
 };
 const saveWatch = () => localStorage.setItem('tide.watch', JSON.stringify(S.watch));
 const saveAlerts = () => localStorage.setItem('tide.alerts', JSON.stringify(S.alerts));
+const saveTox = () => localStorage.setItem('tide.tox', S.tox);
 
 // ---- helpers ----
 const fp = p => '$' + (p == null ? '–' : p.toFixed(2));
@@ -103,10 +105,26 @@ function applyAlerts() {
     fired.forEach(f => pushToast(f.stock + ' alert triggered', condText(f) + ' — now ' + fp(f.px)));
   }
 }
+// ---- LM Toxicity Scale: maps the slider to the required downside floor and
+// re-ranks the candidate set into the top-N, entirely client-side. ----
+const TOPN = () => (S.payload && S.payload.top_n) || 5;
+function floorReq() { return Math.max(0, 0.70 * (1 - S.tox / 100)); }
+function riskLabel(t) { return t < 25 ? 'Conservative' : t < 50 ? 'Balanced' : t < 75 ? 'Aggressive' : 'Toxic'; }
+function topRows() {
+  const cand = S.candidates || [], fr = floorReq();
+  cand.forEach(c => { const p = c.prediction; if (p) p.safe_gate_passed = (p.p_safe != null && p.p_safe >= fr); });
+  if (!cand.some(c => gated(c))) return cand.slice(0, TOPN());     // model suppressed → server order
+  let elig = cand.filter(c => gated(c) && c.prediction.p_safe != null && c.prediction.p_safe >= fr);
+  if (!elig.length) elig = cand.filter(c => gated(c));            // none clear floor → top conviction
+  elig.sort((a, b) => (b.prediction.p_pop - a.prediction.p_pop) || ((b.prediction.p_safe || 0) - (a.prediction.p_safe || 0)));
+  return elig.slice(0, TOPN());
+}
 function ingest(payload) {
-  S.payload = payload; S.rows = payload.rows || [];
-  S.rows.forEach(r => { S.lastBySym[r.symbol] = r; });
-  if (!S.selectedId && S.rows[0]) S.selectedId = S.rows[0].symbol;
+  S.payload = payload;
+  S.candidates = payload.candidates || payload.rows || [];
+  S.candidates.forEach(r => { S.lastBySym[r.symbol] = r; });
+  const t = topRows();
+  if (!S.selectedId && t[0]) S.selectedId = t[0].symbol;
   applyAlerts();
   if (S.view === 'scanner') renderView();
   else if (S.view === 'watch') renderView();
@@ -130,7 +148,7 @@ function condText(a) {
   if (a.type === 'priceBelow') return 'Price at/below ' + fp(a.value);
   return 'Conviction above ' + Math.round(a.value) + '%';
 }
-function featured() { return S.rows.find(r => r.symbol === S.selectedId) || S.rows[0] || null; }
+function featured() { const t = topRows(); return t.find(r => r.symbol === S.selectedId) || t[0] || null; }
 
 // ============================ header ============================
 function headerHTML() {
@@ -185,12 +203,45 @@ function bannerHTML() {
 }
 function banner(msg) { return `<div style="background:rgba(201,138,30,.08);border:1px solid rgba(201,138,30,.25);border-radius:12px;padding:11px 15px;font-size:12.5px;color:#9A6B12;margin-bottom:16px;line-height:1.5">${msg}</div>`; }
 
+function toxLabelHTML() {
+  return `${S.tox} · ${riskLabel(S.tox)} · min floor ${Math.round(floorReq() * 100)}%`;
+}
 function scannerHTML() {
-  const rows = S.rows;
-  const qualified = rows.filter(r => { const c = conv(r); return c != null && c >= CONV_THRESHOLD; }).length;
+  const nCand = (S.candidates || []).length;
+  return `${bannerHTML()}
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${ACCENT};margin-bottom:5px">Real-time opportunity scan</div>
+        <h1 style="margin:0;font-size:27px;font-weight:800;letter-spacing:-.025em">Prospective Leaderboard</h1>
+        <p style="margin:6px 0 0;font-size:13.5px;color:#6E6E78;max-width:600px;line-height:1.5">Your top ${TOPN()} by calibrated <strong style="color:#43424A">conviction of +10% inside 24–48h</strong> — filtered by the downside-floor your <b>toxicity</b> setting allows. Conviction and floor are <b>model estimates</b>.</p>
+      </div>
+      <div style="display:flex;gap:18px;align-items:center">
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${ACCENT};line-height:1">${(S.payload.model_loaded === false) ? '—' : nCand}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Candidates scanned</div></div>
+        <div style="width:1px;height:38px;background:#E4E2DA"></div>
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1">${TOPN()}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Top shown</div></div>
+      </div>
+    </div>
+    <div id="toxbar" style="margin:0 0 16px;padding:13px 16px;background:#fff;border:1px solid #E8E6DF;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="font-size:12.5px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:${ACCENT}"></span>LM Toxicity Scale</div>
+        <input type="range" min="0" max="100" value="${S.tox}" data-act="tox" style="flex:1;min-width:170px;accent-color:${ACCENT};cursor:pointer">
+        <div id="toxval" style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:${ACCENT};min-width:210px;text-align:right">${toxLabelHTML()}</div>
+      </div>
+      <div style="font-size:11px;color:#9C9CA6;margin-top:7px;line-height:1.4">Dial up to tolerate more risk (lower downside-floor requirement → higher-upside, more volatile names enter your top ${TOPN()}); dial down for only the downside-safe names. Re-ranks instantly.</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin:0 0 16px;padding:11px 15px;background:#FAF9F6;border:1px solid #EEECE5;border-radius:11px;font-size:11.5px;color:#8B8A93;line-height:1.45">
+      <span><b style="color:#43424A">Conviction</b> — calibrated probability of a <b>+10% move within 1–2 days</b>.</span>
+      <span><b style="color:#43424A">48h potential</b> — estimated favorable move over ~48h, from the stock's recent volatility (an estimate of size, not a promise).</span>
+      <span><b style="color:#43424A">Floor</b> — confidence the price <b>stays above ~5% below your entry</b> for ~3 weeks (downside protection).</span>
+    </div>
+    <div id="boardRoot">${scannerBoardHTML()}</div>
+    ${footerHTML()}`;
+}
+function scannerBoardHTML() {
+  const rows = topRows();
   const f = featured();
   if (!rows.length) {
-    return `${bannerHTML()}<div style="background:#fff;border:1px dashed #DAD8D0;border-radius:16px;padding:54px;text-align:center;color:#9C9CA6"><div style="font-size:15px;font-weight:600;color:#6E6E78;margin-bottom:4px">No names currently clear the filters</div><div style="font-size:13px">That's expected — genuine +10% moves in 1–2 days are rare. Waiting for the next scan…</div></div>`;
+    return `<div style="background:#fff;border:1px dashed #DAD8D0;border-radius:16px;padding:54px;text-align:center;color:#9C9CA6"><div style="font-size:15px;font-weight:600;color:#6E6E78;margin-bottom:4px">Nothing clears your current toxicity setting</div><div style="font-size:13px">Dial the LM Toxicity Scale up to allow more risk, or wait for the next scan.</div></div>`;
   }
   const rowHTML = rows.map((s, i) => {
     const [bg, fg] = hashColors(s.symbol);
@@ -215,25 +266,7 @@ function scannerHTML() {
     </tr>`;
   }).join('');
 
-  return `${bannerHTML()}
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${ACCENT};margin-bottom:5px">Real-time opportunity scan</div>
-        <h1 style="margin:0;font-size:27px;font-weight:800;letter-spacing:-.025em">Prospective Leaderboard</h1>
-        <p style="margin:6px 0 0;font-size:13.5px;color:#6E6E78;max-width:600px;line-height:1.5">Ranked by a calibrated <strong style="color:#43424A">conviction of +10% inside 24–48h</strong>, gated by a downside-floor confidence that price holds above entry for ~3 weeks. Conviction and floor are <b>model estimates</b> — see the trust badge.</p>
-      </div>
-      <div style="display:flex;gap:18px;align-items:center">
-        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${ACCENT};line-height:1">${trustworthy() ? qualified : '—'}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Qualified signals</div></div>
-        <div style="width:1px;height:38px;background:#E4E2DA"></div>
-        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1">${(S.payload.model_loaded === false) ? '—' : rows.length}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Live signals</div></div>
-      </div>
-    </div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;margin:0 0 16px;padding:11px 15px;background:#FAF9F6;border:1px solid #EEECE5;border-radius:11px;font-size:11.5px;color:#8B8A93;line-height:1.45">
-      <span><b style="color:#43424A">Conviction</b> — calibrated probability of a <b>+10% move within 1–2 days</b>.</span>
-      <span><b style="color:#43424A">48h potential</b> — estimated favorable move over ~48h, from the stock's recent volatility (an estimate of size, not a promise).</span>
-      <span><b style="color:#43424A">Floor</b> — confidence the price <b>stays above ~5% below your entry</b> for ~3 weeks (downside protection).</span>
-    </div>
-    ${f ? featuredHTML(f) : ''}
+  return `${f ? featuredHTML(f) : ''}
     <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #EEECE5;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:10px"><span style="font-size:14px;font-weight:700">Live leaderboard</span><span style="font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT_SOFT};padding:3px 9px;border-radius:20px">top ${rows.length}</span></div>
@@ -245,8 +278,7 @@ function scannerHTML() {
         </tr></thead>
         <tbody>${rowHTML}</tbody>
       </table></div>
-    </div>
-    ${footerHTML()}`;
+    </div>`;
 }
 
 function featuredHTML(f) {
@@ -486,7 +518,16 @@ document.addEventListener('change', e => {
   if (t.dataset.act === 'formStock') S.form.stock = t.value;
   else if (t.dataset.act === 'formType') { S.form.type = t.value; const fm = document.getElementById('alertForm'); if (fm) fm.innerHTML = alertFormHTML(); }
 });
-document.addEventListener('input', e => { const t = e.target.closest('[data-act]'); if (t && t.dataset.act === 'formValue') S.form.value = t.value; });
+document.addEventListener('input', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  if (t.dataset.act === 'formValue') { S.form.value = t.value; return; }
+  if (t.dataset.act === 'tox') {
+    S.tox = +t.value; saveTox();
+    const tv = document.getElementById('toxval'); if (tv) tv.innerHTML = toxLabelHTML();
+    const br = document.getElementById('boardRoot'); if (br) br.innerHTML = scannerBoardHTML();
+    mountTV();
+  }
+});
 
 function toggleWatch(id) { S.watch = S.watch.includes(id) ? S.watch.filter(x => x !== id) : [...S.watch, id]; saveWatch(); }
 function addAlert() {

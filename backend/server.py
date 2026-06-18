@@ -48,6 +48,14 @@ SCREEN_SECONDS = float(os.getenv("SCREEN_SECONDS", "900"))
 TOP_N = int(os.getenv("TOP_N", "5"))
 CANDIDATE_POOL = int(os.getenv("CANDIDATE_POOL", "50"))
 SAFE_THRESHOLD = float(os.getenv("SAFE_THRESHOLD", "0.40"))
+DEFAULT_TOXICITY = float(os.getenv("DEFAULT_TOXICITY", "45"))
+
+
+def _floor_req(tox: float) -> float:
+    """LM Toxicity Scale → required downside floor. tox 0 (safe) needs a 0.70
+    floor; tox 100 (toxic) needs none. The client mirrors this so the slider
+    re-ranks instantly; the server uses it only for the default top-5."""
+    return max(0.0, 0.70 * (1.0 - float(tox) / 100.0))
 
 provider = get_provider()
 _universe = provider.universe()
@@ -100,6 +108,27 @@ def _enrich_sectors(rows):
             continue
         if m.get("sector"):
             r["sector"] = m["sector"]
+
+
+def _select_pool(rows, n):
+    """Pick a candidate pool that SPANS the risk spectrum so the toxicity slider
+    has names at every floor level: half the highest-growth (P(pop)) names, half
+    the safest (P(safe)) names, then fill from growth. Falls back to composite."""
+    wp = [(sc, row, p) for sc, row, p in rows if p and p.p_pop is not None]
+    if not wp:
+        return [sc.symbol for sc, _, _ in sorted(rows, key=lambda r: -r[0].composite)[:n]]
+    by_pop = sorted(wp, key=lambda r: (r[2].p_pop or 0, r[2].p_safe or 0), reverse=True)
+    by_safe = sorted(wp, key=lambda r: (r[2].p_safe or 0, r[2].p_pop or 0), reverse=True)
+    half = max(1, n // 2)
+    syms, seen = [], set()
+    for src in (by_pop[:half], by_safe[:half], by_pop):
+        for sc, _, _ in src:
+            if sc.symbol not in seen:
+                seen.add(sc.symbol)
+                syms.append(sc.symbol)
+            if len(syms) >= n:
+                return syms
+    return syms
 
 
 def _build_rows(snaps):
@@ -158,9 +187,9 @@ async def _screen_loop():
         try:
             snaps = await asyncio.to_thread(provider.snapshot, _universe)
             rows = await asyncio.to_thread(_build_rows, snaps)
-            pool = _rank(rows, CANDIDATE_POOL, gate=True)
+            pool = _select_pool(rows, CANDIDATE_POOL)
             async with _lock:
-                _pool = [sc.symbol for sc, _, _ in pool] or list(_universe)[:CANDIDATE_POOL]
+                _pool = pool or list(_universe)[:CANDIDATE_POOL]
                 _last_screen_ts = time.time()
             print(f"[screen] scanned {len(_universe)} -> pool {len(_pool)}")
         except Exception as e:  # noqa: BLE001
@@ -181,23 +210,30 @@ async def _refresh_loop():
             await asyncio.to_thread(broker.mark, prices)
             poolset = set(pool)
             rows = await asyncio.to_thread(_build_rows, [s for s in snaps if s.symbol in poolset])
-            top = _rank(rows, TOP_N, gate=True)
-            payload_rows = [row for _, row, _ in top]
-            # replace "Unknown" sectors on the displayed rows with the real
-            # industry (cached; only the published top-N, so it's cheap).
-            await asyncio.to_thread(_enrich_sectors, payload_rows)
-            # smart-money OVERLAY (top-N only, cached ~12h): a labeled side-signal +
-            # tiebreak. Never alters the calibrated probability.
+            # candidates = every pool name with a prediction, ranked growth(P(pop))
+            # → confidence(P(safe)). The client's LM Toxicity Scale slider gates and
+            # ranks these into the top-N (so the slider re-ranks instantly).
+            cand = sorted(rows, key=lambda r: (
+                (r[2].p_pop if (r[2] and r[2].p_pop is not None) else -1.0),
+                (r[2].p_safe if (r[2] and r[2].p_safe is not None) else -1.0)), reverse=True)
+            candidates = [row for _, row, _ in cand]
+            await asyncio.to_thread(_enrich_sectors, candidates)  # real sectors (cached)
             if altdata.enabled():
-                # attach the smart-money badge only — do NOT re-sort; the order is
-                # the nested growth(P(pop))→confidence(P(safe)) ranking from _rank.
-                for row in payload_rows:
+                for row in candidates:
                     sm = await asyncio.to_thread(altdata.congress_activity, row["symbol"])
                     row["smart_money"] = {"available": sm.get("available", False),
                                           "net": sm.get("net"), "buys": sm.get("buys"),
                                           "sells": sm.get("sells")}
+            # server-side default top-N (for clients that don't send a toxicity)
+            fr = _floor_req(DEFAULT_TOXICITY)
+            gated = [r for r in candidates if r["prediction"].get("available")
+                     and r["prediction"].get("p_safe") is not None
+                     and r["prediction"]["p_safe"] >= fr]
+            default_top = (gated or [r for r in candidates if r["prediction"].get("available")]
+                           or candidates)[:TOP_N]
             async with _lock:
-                _latest["rows"] = payload_rows
+                _latest["candidates"] = candidates
+                _latest["rows"] = default_top
                 _latest["ts"] = time.time()
                 _last_prices.update(prices)
         except Exception as e:  # noqa: BLE001
@@ -224,6 +260,8 @@ app.add_middleware(
 def _leaderboard_payload() -> dict:
     return {
         "rows": _latest["rows"],
+        "candidates": _latest.get("candidates", []),
+        "default_toxicity": DEFAULT_TOXICITY,
         "ts": _latest["ts"],
         "refresh": REFRESH_SECONDS,
         "last_screen_ts": _last_screen_ts,

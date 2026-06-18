@@ -25,7 +25,13 @@ def _load_dotenv() -> None:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, _, val = line.partition("=")
-            key, val = key.strip(), val.strip().strip('"').strip("'")
+            key, val = key.strip(), val.strip()
+            # strip an inline comment ( value  # note ) before unquoting
+            for sep in (" #", "\t#"):
+                i = val.find(sep)
+                if i != -1:
+                    val = val[:i]
+            val = val.strip().strip('"').strip("'")
             if key and key not in os.environ:
                 os.environ[key] = val
     except Exception:
