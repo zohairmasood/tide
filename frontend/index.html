@@ -109,7 +109,13 @@ function applyAlerts() {
 // re-ranks the candidate set into the top-N, entirely client-side. ----
 const TOPN = () => (S.payload && S.payload.top_n) || 5;
 function floorReq() { return Math.max(0, 0.70 * (1 - S.tox / 100)); }
-function riskLabel(t) { return t < 25 ? 'Conservative' : t < 50 ? 'Balanced' : t < 75 ? 'Aggressive' : 'Toxic'; }
+function riskLabel(t) {
+  if (t === 0) return 'Swathi';
+  if (t === 69) return 'Nice';
+  if (t === 100) return 'Radu';
+  if (t >= 85) return 'Toxic';
+  return t < 25 ? 'Conservative' : t < 50 ? 'Balanced' : 'Aggressive';
+}
 function topRows() {
   const cand = S.candidates || [], fr = floorReq();
   cand.forEach(c => { const p = c.prediction; if (p) p.safe_gate_passed = (p.p_safe != null && p.p_safe >= fr); });
