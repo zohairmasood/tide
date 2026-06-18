@@ -183,6 +183,7 @@ function scannerHTML() {
     const [bg, fg] = hashColors(s.symbol);
     const watched = S.watch.includes(s.symbol), top3 = i < 3;
     const c = conv(s), fl = floorVal(s);
+    const pgr = s.prediction && s.prediction.potential_growth_pct;
     const convCell = c == null
       ? `<span style="font-size:11.5px;color:#A0A0A8">n/a · activity rank</span>`
       : `<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#F0EEE7;border-radius:4px;overflow:hidden;min-width:60px"><div style="height:100%;border-radius:4px;width:${Math.round(c)}%;background:${convColor(c)}"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:${convColor(c)};min-width:34px">${Math.round(c)}%</span><span style="font-size:11px;color:#11A06B">${c >= CONV_THRESHOLD ? '✓' : ''}</span></div>`;
@@ -193,7 +194,7 @@ function scannerHTML() {
       <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:${dirColor(s.session_pct)}">${fp(s.last)}</td>
       <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${dirColor(s.session_pct)}">${fpct(s.session_pct)}</td>
       <td style="padding:13px 12px;min-width:150px">${convCell}</td>
-      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#11A06B">+10%</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#11A06B">${pgr == null ? 'n/a' : '~' + pgr + '%'}</td>
       <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${fl == null ? '#A0A0A8' : fl >= 55 ? '#11A06B' : '#C98A1E'}">${fl == null ? 'n/a' : Math.round(fl) + '%'}</td>
       <td style="padding:13px 12px;text-align:center"><svg width="78" height="26" viewBox="0 0 78 26" preserveAspectRatio="none" style="display:block;margin:0 auto"><polyline points="${spark(s.sparkline, 78, 26)}" fill="none" stroke="${s.session_pct >= 0 ? '#11A06B' : '#E0504F'}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></td>
       <td style="padding:13px 12px;text-align:right"><span style="display:inline-block;min-width:34px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${s.composite >= 60 ? '#fff' : '#5C5B64'};background:${s.composite >= 60 ? ACCENT : '#EEECE5'};padding:3px 8px;border-radius:7px">${Math.round(s.composite)}</span></td>
@@ -214,6 +215,11 @@ function scannerHTML() {
         <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1">${(S.payload.model_loaded === false) ? '—' : rows.length}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Live signals</div></div>
       </div>
     </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin:0 0 16px;padding:11px 15px;background:#FAF9F6;border:1px solid #EEECE5;border-radius:11px;font-size:11.5px;color:#8B8A93;line-height:1.45">
+      <span><b style="color:#43424A">Conviction</b> — calibrated probability of a <b>+10% move within 1–2 days</b>.</span>
+      <span><b style="color:#43424A">48h potential</b> — estimated favorable move over ~48h, from the stock's recent volatility (an estimate of size, not a promise).</span>
+      <span><b style="color:#43424A">Floor</b> — confidence the price <b>stays above ~5% below your entry</b> for ~3 weeks (downside protection).</span>
+    </div>
     ${f ? featuredHTML(f) : ''}
     <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #EEECE5;flex-wrap:wrap;gap:10px">
@@ -222,7 +228,7 @@ function scannerHTML() {
       </div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:920px">
         <thead><tr style="background:#FAF9F6">
-          ${['#', 'Symbol', 'Price', '24h', 'Conviction', 'Target', 'Floor', '7d', 'Score', ''].map((h, i) => `<th style="text-align:${i <= 1 || i === 4 ? 'left' : i === 7 || i === 8 && false ? 'center' : 'right'};padding:11px ${i === 0 ? '12px 11px 20px' : i === 9 ? '11px 20px 11px 12px' : '12px'};font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">${h}</th>`).join('')}
+          ${['#', 'Symbol', 'Price', '24h', 'Conviction', '48h potential', 'Floor', '7d', 'Score', ''].map((h, i) => `<th style="text-align:${i <= 1 || i === 4 ? 'left' : i === 7 || i === 8 && false ? 'center' : 'right'};padding:11px ${i === 0 ? '12px 11px 20px' : i === 9 ? '11px 20px 11px 12px' : '12px'};font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">${h}</th>`).join('')}
         </tr></thead>
         <tbody>${rowHTML}</tbody>
       </table></div>
@@ -234,11 +240,12 @@ function featuredHTML(f) {
   const [bg, fg] = hashColors(f.symbol);
   const fwatched = S.watch.includes(f.symbol);
   const c = conv(f), fl = floorVal(f), br = baseRate();
+  const pg = f.prediction && f.prediction.potential_growth_pct;
   const armable = gated(f) && (f.prediction.safe_gate_passed !== false);
   const gauges = [
-    { label: 'Upside conviction', val: c == null ? 'n/a' : Math.round(c) + '%', vc: convColor(c), pct: c == null ? 0 : Math.round(c), color: convColor(c), detail: c == null ? 'Suppressed — model not display-validated or insufficient live data.' : 'P(+10% within 24–48h)' + (br ? ' · ' + (c / br).toFixed(1) + '× the ' + Math.round(br) + '% base rate' : '') },
-    { label: 'Projected target', val: '+10%', vc: '#11A06B', pct: 50, color: '#11A06B', detail: 'The move the model is scoring the probability of.' },
-    { label: 'Downside floor', val: fl == null ? 'n/a' : Math.round(fl) + '%', vc: fl == null ? '#A0A0A8' : fl >= 55 ? '#11A06B' : '#C98A1E', pct: fl == null ? 0 : Math.round(fl), color: fl == null ? '#D9D7CF' : fl >= 55 ? '#11A06B' : '#C98A1E', detail: 'P(price holds above entry for ~3 weeks).' },
+    { label: 'Conviction', val: c == null ? 'n/a' : Math.round(c) + '%', vc: convColor(c), pct: c == null ? 0 : Math.round(c), color: convColor(c), detail: c == null ? 'Suppressed — model not display-validated or insufficient live data.' : 'Calibrated probability of a +10% move within 1–2 days' + (br ? ' · ' + (c / br).toFixed(1) + '× the ' + Math.round(br) + '% base rate' : '') },
+    { label: 'Potential growth · next 48h', val: pg == null ? 'n/a' : '~' + pg + '%', vc: '#11A06B', pct: pg == null ? 0 : Math.min(100, pg * 8), color: '#11A06B', detail: 'Estimated favorable move over ~48h from recent volatility (daily σ × √2). An estimate of size — not a promise.' },
+    { label: 'Downside floor', val: fl == null ? 'n/a' : Math.round(fl) + '%', vc: fl == null ? '#A0A0A8' : fl >= 55 ? '#11A06B' : '#C98A1E', pct: fl == null ? 0 : Math.round(fl), color: fl == null ? '#D9D7CF' : fl >= 55 ? '#11A06B' : '#C98A1E', detail: 'Confidence the price stays at/above ~5% below your entry for the next ~3 weeks — i.e. the downside holds.' },
   ].map(g => `<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:12.5px;font-weight:600;color:#43424A">${g.label} <span style="font-size:9px;font-weight:700;color:${ACCENT};background:${ACCENT_SOFT};padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em">model est.</span></span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${g.vc}">${g.val}</span></div><div style="height:7px;background:#F0EEE7;border-radius:5px;overflow:hidden"><div style="height:100%;border-radius:5px;width:${g.pct}%;background:${g.color}"></div></div><div style="font-size:11px;color:#9C9CA6;margin-top:5px;line-height:1.4">${g.detail}</div></div>`).join('');
   const factors = ((f.prediction && f.prediction.contributions) || []).slice(0, 3).map(x => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:${x.value >= 0 ? '#11A06B' : '#E0504F'}"></span><span style="font-size:12.5px;color:#43424A;flex:1">${esc(x.feature.replace(/_/g, ' '))}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#6E6E78">${x.value >= 0 ? '+' : ''}${x.value.toFixed(2)}</span></div>`).join('') || '<div style="font-size:12px;color:#9C9CA6">No model contributions (running on activity score).</div>';
   const ch = f.session_pct;

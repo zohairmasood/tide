@@ -25,6 +25,7 @@ class Prediction:
     feature_vector: dict         # the live features actually fed to the model
     data_sufficient: bool        # were features computable from this snapshot?
     note: str = ""
+    potential_growth_pct: float | None = None  # est. favorable 48h move (volatility-based)
 
     def to_dict(self, top_contrib: int = 3) -> dict:
         contrib = sorted(
@@ -34,6 +35,7 @@ class Prediction:
             "available": self.data_sufficient and self.p_pop is not None,
             "p_pop": None if self.p_pop is None else round(self.p_pop, 4),
             "p_safe": None if self.p_safe is None else round(self.p_safe, 4),
+            "potential_growth_pct": self.potential_growth_pct,
             "data_sufficient": self.data_sufficient,
             "contributions": [{"feature": k, "value": round(v, 4)} for k, v in contrib],
             "note": self.note,
@@ -71,7 +73,12 @@ class MomentumModel:
         p_pop = self._proba(self.pop_clf, X)
         p_safe = self._proba(self.safe_clf, X)
         contrib = self._contributions(feats, p_pop)
-        return Prediction(symbol, p_pop, p_safe, contrib, feats, True, note)
+        # "potential growth over the next ~48h" = expected favorable 2-day move
+        # from recent volatility: daily stdev (%) scaled to 2 trading days (×√2).
+        rv = feats.get("realized_vol_20d")
+        pg = round(rv * (2 ** 0.5), 1) if (rv and rv == rv and rv > 0) else None
+        return Prediction(symbol, p_pop, p_safe, contrib, feats, True, note,
+                          potential_growth_pct=pg)
 
     def predict_batch(self, items: list[tuple]) -> list[Prediction]:
         """items: list of (symbol, feats|None, data_sufficient, note)."""
