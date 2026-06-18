@@ -76,7 +76,10 @@ class MomentumModel:
         # "potential growth over the next ~48h" = expected favorable 2-day move
         # from recent volatility: daily stdev (%) scaled to 2 trading days (×√2).
         rv = feats.get("realized_vol_20d")
-        pg = round(rv * (2 ** 0.5), 1) if (rv and rv == rv and rv > 0) else None
+        pg = rv * (2 ** 0.5) if (rv and rv == rv and rv > 0) else None
+        # guard against data artifacts (unadjusted splits / illiquid prints) that
+        # produce absurd volatility — a >35% expected 2-day move isn't real signal.
+        pg = round(pg, 1) if (pg is not None and pg <= 35) else None
         return Prediction(symbol, p_pop, p_safe, contrib, feats, True, note,
                           potential_growth_pct=pg)
 
