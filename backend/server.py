@@ -129,7 +129,10 @@ def _rank(rows, top: int, gate: bool = True):
         elig = [(sc, row, p) for sc, row, p, passed in withpred if (passed or not gate)]
         if not elig:  # nothing cleared the downside floor — still show top conviction
             elig = [(sc, row, p) for sc, row, p, _ in withpred]
-        elig.sort(key=lambda r: r[2].p_pop, reverse=True)
+        # Nested rank among names that meet the downside-confidence gate:
+        #   1) growth potential  = P(pop)   (highest first)
+        #   2) confidence        = P(safe)  (tiebreak, highest first)
+        elig.sort(key=lambda r: (r[2].p_pop or 0.0, r[2].p_safe or 0.0), reverse=True)
         return elig[:top]
     # fallback: rank by the explainable composite
     rows = sorted(rows, key=lambda r: r[0].composite, reverse=True)
@@ -170,13 +173,13 @@ async def _refresh_loop():
             # smart-money OVERLAY (top-N only, cached ~12h): a labeled side-signal +
             # tiebreak. Never alters the calibrated probability.
             if altdata.enabled():
+                # attach the smart-money badge only — do NOT re-sort; the order is
+                # the nested growth(P(pop))→confidence(P(safe)) ranking from _rank.
                 for row in payload_rows:
                     sm = await asyncio.to_thread(altdata.congress_activity, row["symbol"])
                     row["smart_money"] = {"available": sm.get("available", False),
                                           "net": sm.get("net"), "buys": sm.get("buys"),
                                           "sells": sm.get("sells")}
-                payload_rows.sort(key=lambda r: (-(r["prediction"].get("p_pop") or 0),
-                                                 -((r.get("smart_money") or {}).get("net") or 0)))
             async with _lock:
                 _latest["rows"] = payload_rows
                 _latest["ts"] = time.time()
