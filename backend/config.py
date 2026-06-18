@@ -45,7 +45,7 @@ SAFE_HORIZON = int(os.getenv("SAFE_HORIZON", "15"))          # ~3 trading weeks
 # = 1%). The intent ("won't go lower than current price") is well served by a
 # small buffer; train.py reports the base rate at both 0 and the buffer so the
 # choice is made knowingly.
-SAFE_BUFFER = float(os.getenv("SAFE_BUFFER", "0.0"))
+SAFE_BUFFER = float(os.getenv("SAFE_BUFFER", "0.05"))
 
 # --- Artifact / cache locations ----------------------------------------------
 MODEL_PATH = os.getenv("MODEL_PATH", "./.model/model.joblib")

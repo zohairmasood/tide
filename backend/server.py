@@ -47,7 +47,7 @@ REFRESH_SECONDS = float(os.getenv("REFRESH_SECONDS", "3"))
 SCREEN_SECONDS = float(os.getenv("SCREEN_SECONDS", "900"))
 TOP_N = int(os.getenv("TOP_N", "5"))
 CANDIDATE_POOL = int(os.getenv("CANDIDATE_POOL", "50"))
-SAFE_THRESHOLD = float(os.getenv("SAFE_THRESHOLD", "0.55"))
+SAFE_THRESHOLD = float(os.getenv("SAFE_THRESHOLD", "0.50"))
 
 provider = get_provider()
 _universe = provider.universe()
@@ -119,15 +119,16 @@ def _build_rows(snaps):
 def _rank(rows, top: int, gate: bool = True):
     have_preds = any(r[2] and r[2].p_pop is not None for r in rows)
     if have_preds:
-        elig = []
+        withpred = []
         for sc, row, p in rows:
             if not (p and p.p_pop is not None):
                 continue
             passed = (p.p_safe or 0.0) >= SAFE_THRESHOLD
             row["prediction"]["safe_gate_passed"] = passed
-            if gate and not passed:
-                continue
-            elig.append((sc, row, p))
+            withpred.append((sc, row, p, passed))
+        elig = [(sc, row, p) for sc, row, p, passed in withpred if (passed or not gate)]
+        if not elig:  # nothing cleared the downside floor — still show top conviction
+            elig = [(sc, row, p) for sc, row, p, _ in withpred]
         elig.sort(key=lambda r: r[2].p_pop, reverse=True)
         return elig[:top]
     # fallback: rank by the explainable composite
