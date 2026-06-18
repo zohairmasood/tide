@@ -128,6 +128,31 @@ def load_real(start: str, end: str, max_symbols: int):
     return bars_by_symbol, sector_by_symbol
 
 
+def load_curated(start: str, max_symbols: int):
+    """Free-tier-friendly path: skip the broad whole-market screen (which burns
+    the rate limit) and train on the curated liquid set in providers._SECTORS.
+    Pair with POLYGON_MIN_INTERVAL to stay under a free-tier req/min cap."""
+    import datetime as dt
+    from history import HistoryProvider
+    from providers import _SECTORS
+    hist = HistoryProvider()
+    syms = list(_SECTORS)[:max_symbols]
+    lookback = (dt.date.today() - dt.date.fromisoformat(start)).days + 5
+    print(f"[train] curated universe: {len(syms)} symbols (throttled fetch)...")
+    bars_by_symbol, sector_by_symbol = {}, {}
+    for i, sym in enumerate(syms):
+        try:
+            bars = hist.daily(sym, lookback_days=lookback)
+        except Exception as e:  # noqa: BLE001
+            print(f"[train] {sym} history failed: {e}")
+            continue
+        if len(bars) > 60:
+            bars_by_symbol[sym] = bars
+            sector_by_symbol[sym] = _SECTORS[sym]
+        print(f"[train]   {i + 1}/{len(syms)} {sym} ({len(bars)} bars)")
+    return bars_by_symbol, sector_by_symbol
+
+
 # ---------------------------------------------------------------------------
 # Training helpers
 # ---------------------------------------------------------------------------
@@ -265,6 +290,8 @@ def _time_split(meta, embargo_days: int):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--synthetic", action="store_true")
+    ap.add_argument("--curated", action="store_true",
+                    help="free-tier path: train on the curated liquid set, no broad screen")
     ap.add_argument("--start", default="2024-06-01")
     ap.add_argument("--end", default="2026-06-01")
     ap.add_argument("--model", choices=["hgb", "lgbm"], default="hgb")
@@ -280,6 +307,8 @@ def main():
     if args.synthetic:
         print("[train] generating synthetic universe (no key)...")
         bars_by_symbol, sector_by_symbol = generate_synthetic()
+    elif args.curated:
+        bars_by_symbol, sector_by_symbol = load_curated(args.start, args.max_symbols)
     else:
         bars_by_symbol, sector_by_symbol = load_real(args.start, args.end, args.max_symbols)
     if not bars_by_symbol:

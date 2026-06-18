@@ -65,11 +65,39 @@ class HistoryProvider:
         self.base = "https://api.polygon.io"
         self._requests = None
 
+    _last_call = 0.0  # class-wide throttle clock (shared across instances)
+
     def _client(self):
         if self._requests is None:
             import requests
             self._requests = requests
         return self._requests
+
+    def _request(self, url: str, params: dict) -> dict:
+        """GET with optional throttle + 429/5xx backoff. Set POLYGON_MIN_INTERVAL
+        (seconds between calls) on a rate-limited (free) tier, e.g. 13 for the
+        5-req/min limit. Returns parsed JSON or raises after retries."""
+        import time as _t
+        interval = float(os.getenv("POLYGON_MIN_INTERVAL", "0"))
+        resp = None
+        for _ in range(6):
+            if interval:
+                wait = interval - (_t.time() - HistoryProvider._last_call)
+                if wait > 0:
+                    _t.sleep(wait)
+            HistoryProvider._last_call = _t.time()
+            resp = self._client().get(url, params=params, timeout=30)
+            if resp.status_code == 429:
+                ra = resp.headers.get("Retry-After")
+                _t.sleep(float(ra) if ra else max(15.0, interval or 15.0))
+                continue
+            if resp.status_code >= 500:
+                _t.sleep(2.0)
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        resp.raise_for_status()
+        return resp.json()
 
     def daily(self, symbol: str, lookback_days: int = 730) -> list[Bar]:
         cached = _read_cache(symbol)
@@ -86,10 +114,9 @@ class HistoryProvider:
         start = end - dt.timedelta(days=lookback_days)
         url = (f"{self.base}/v2/aggs/ticker/{symbol.upper()}/range/1/day/"
                f"{start.isoformat()}/{end.isoformat()}")
-        r = self._client().get(url, params={"adjusted": "true", "sort": "asc",
-                                            "limit": 50000, "apiKey": self.key}, timeout=15)
-        r.raise_for_status()
-        results = r.json().get("results", []) or []
+        body = self._request(url, {"adjusted": "true", "sort": "asc",
+                                   "limit": 50000, "apiKey": self.key})
+        results = body.get("results", []) or []
         bars = [Bar(t=x["t"], o=x["o"], h=x["h"], l=x["l"], c=x["c"],
                     v=int(x["v"]), vw=x.get("vw", x["c"])) for x in results]
         if bars:
@@ -120,9 +147,8 @@ class HistoryProvider:
         if not self.key:
             raise RuntimeError("POLYGON_API_KEY not set (grouped_daily needs real data)")
         url = (f"{self.base}/v2/aggs/grouped/locale/us/market/stocks/{iso}")
-        r = self._client().get(url, params={"adjusted": "true", "apiKey": self.key}, timeout=30)
-        r.raise_for_status()
-        results = r.json().get("results", []) or []
+        body = self._request(url, {"adjusted": "true", "apiKey": self.key})
+        results = body.get("results", []) or []
         out: dict[str, Bar] = {}
         for x in results:
             t = x.get("T")
@@ -152,9 +178,7 @@ class HistoryProvider:
         params = {"market": "stocks", "type": type_, "active": "true",
                   "limit": 1000, "apiKey": self.key}
         for _ in range(50):  # hard page cap (50k tickers) — safety, not expected
-            r = self._client().get(url, params=params, timeout=30)
-            r.raise_for_status()
-            body = r.json()
+            body = self._request(url, params)
             out.extend(body.get("results", []) or [])
             nxt = body.get("next_url")
             if not nxt:
