@@ -1,458 +1,514 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tide · Predictive Momentum</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tide · Opportunity Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0a0e14; --panel:#10151f; --line:#1d2533; --ink:#e8edf4;
-    --dim:#7c8aa0; --faint:#4a5568;
-    --rise:#3ddc97; --fall:#ff5c6c; --flat:#8a96a8; --warn:#ffb454;
-    --beam:#5b8cff; --beam2:#9d7bff;
-    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
-    --sans:"Söhne","Inter",system-ui,-apple-system,sans-serif;
-  }
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
-    font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased;min-height:100vh;
-    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(91,140,255,.08),transparent),radial-gradient(900px 500px at -10% 110%,rgba(157,123,255,.06),transparent);}
-  .wrap{max-width:1100px;margin:0 auto;padding:28px 22px 60px}
-  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:20px}
-  .brand{display:flex;align-items:baseline;gap:14px}
-  .mark{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.32em;color:var(--beam);text-transform:uppercase;border:1px solid var(--line);padding:6px 11px;border-radius:5px;background:linear-gradient(180deg,rgba(91,140,255,.10),transparent)}
-  h1{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1}
-  .sub{color:var(--dim);font-size:13px;margin-top:6px;max-width:520px;line-height:1.5}
-  .status{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:12px;flex-wrap:wrap}
-  .pulse{display:flex;align-items:center;gap:7px;color:var(--dim)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);transition:.3s}
-  .dot.on{background:var(--rise);animation:ping 2.4s infinite}
-  @keyframes ping{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5)}70%{box-shadow:0 0 0 7px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
-  .trustbadge{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:5px 11px;cursor:pointer}
-  .trustbadge:hover{border-color:var(--faint);color:var(--ink)}
-  .trustbadge.bad{color:var(--warn);border-color:rgba(255,180,84,.4)}
-  .note{font-size:11.5px;color:var(--faint);line-height:1.55;margin:16px 0 18px;border-left:2px solid var(--line);padding-left:12px;max-width:780px}
-  .note b{color:var(--dim);font-weight:600}
-  .banner{background:rgba(255,180,84,.07);border-left:2px solid var(--warn);color:var(--warn);font-family:var(--mono);font-size:12px;padding:12px 16px;border-radius:6px;margin:14px 0;line-height:1.5}
-  .cards{display:flex;flex-direction:column;gap:14px;margin-top:6px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:border-color .2s}
-  .card:hover{border-color:#27324a}
-  .chead{display:flex;align-items:center;gap:18px;padding:16px 20px;cursor:pointer;flex-wrap:wrap}
-  .rank{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--faint);width:28px;text-align:center}
-  .idblock{min-width:120px}
-  .sym{font-weight:700;font-size:19px;letter-spacing:-.01em}
-  .sector{color:var(--dim);font-size:11px;margin-top:2px}
-  .cat{display:inline-block;margin-top:4px;font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;color:var(--beam2);background:rgba(157,123,255,.10);border:1px solid rgba(157,123,255,.25);padding:2px 6px;border-radius:4px}
-  .px{font-family:var(--mono);text-align:right;min-width:96px}
-  .px .last{font-size:15px;font-weight:600}
-  .px .sess{font-size:12px;margin-top:2px}
-  .rise{color:var(--rise)} .fall{color:var(--fall)} .flat{color:var(--flat)}
-  .gauges{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
-  .gauge{min-width:120px}
-  .glbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px}
-  .est{font-size:8.5px;background:rgba(91,140,255,.12);color:var(--beam);border:1px solid rgba(91,140,255,.3);border-radius:3px;padding:1px 4px;letter-spacing:.02em}
-  .gval{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.1;margin-top:3px}
-  .gmeta{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.35}
-  .gmeta.pass{color:var(--rise)} .gmeta.fail{color:var(--warn)}
-  .unavail{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-left:auto;max-width:240px;text-align:right;line-height:1.4}
-  .chev{color:var(--faint);font-size:18px;transition:transform .2s;margin-left:8px}
-  .card.open .chev{transform:rotate(90deg)}
-  .body{border-top:1px solid var(--line);padding:0;display:none}
-  .card.open .body{display:block}
-  .drivers{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px 4px}
-  .driver{font-family:var(--mono);font-size:10.5px;color:var(--dim);background:#0c1119;border:1px solid var(--line);border-radius:5px;padding:4px 9px}
-  .driver b{color:var(--ink);font-weight:600}
-  .driver .pos{color:var(--rise)} .driver .neg{color:var(--fall)}
-  .section{padding:14px 20px;border-top:1px solid var(--line)}
-  .section h4{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;font-weight:500}
-  .analyst{font-size:13px;line-height:1.6;color:var(--ink)}
-  .caveat{font-size:11.5px;color:var(--warn);margin-top:8px;line-height:1.45}
-  .news{margin-top:10px}
-  .news a{display:block;color:var(--dim);font-size:11.5px;text-decoration:none;padding:3px 0;border-bottom:1px solid rgba(29,37,51,.5)}
-  .news a:hover{color:var(--beam)}
-  .loading{font-family:var(--mono);font-size:12px;color:var(--faint)}
-  .errbox{font-family:var(--mono);font-size:11.5px;color:var(--warn);background:rgba(255,180,84,.06);border-left:2px solid var(--warn);padding:12px 16px;line-height:1.5;border-radius:4px}
-  .panel{background:#0c1119;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px 24px;align-items:start}
-  .panel .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
-  .panel .big{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
-  .panel .meta{font-size:11px;color:var(--dim);margin-top:5px;line-height:1.4}
-  .panel .warn{color:var(--warn)}
-  .panel .full{grid-column:1/-1;font-size:11.5px;color:var(--dim);line-height:1.55;border-top:1px solid var(--line);padding-top:12px}
-  .modal{position:fixed;inset:0;background:rgba(4,7,12,.7);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
-  .modal.show{display:flex}
-  .mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:560px;width:100%;max-height:84vh;overflow:auto;padding:22px}
-  .mbox h3{font-size:16px;margin-bottom:4px}
-  .mbox .mclose{float:right;cursor:pointer;color:var(--faint);font-family:var(--mono)}
-  .reltable{width:100%;border-collapse:collapse;margin-top:10px;font-family:var(--mono);font-size:11px}
-  .reltable th,.reltable td{text-align:right;padding:4px 8px;border-top:1px solid var(--line);color:var(--dim)}
-  .reltable th{color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:500;font-size:9.5px}
-  .empty{text-align:center;color:var(--faint);padding:50px 0;font-family:var(--mono);font-size:13px}
-  .spark{width:90px;height:24px;vertical-align:middle}
-  footer{margin-top:30px;color:var(--faint);font-size:11px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
-  /* smart money badge */
-  .smbadge{display:inline-block;margin-top:5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;color:var(--rise);background:rgba(61,220,151,.10);border:1px solid rgba(61,220,151,.28);padding:2px 6px;border-radius:4px}
-  .smbadge.sell{color:var(--fall);background:rgba(255,92,108,.10);border-color:rgba(255,92,108,.28)}
-  /* arm button */
-  .arm{font-family:var(--mono);font-size:11px;color:var(--beam);background:rgba(91,140,255,.10);border:1px solid rgba(91,140,255,.35);border-radius:6px;padding:8px 12px;cursor:pointer;white-space:nowrap;transition:.15s;margin-left:6px}
-  .arm:hover{background:rgba(91,140,255,.20);color:var(--ink)}
-  .arm small{display:block;color:var(--faint);font-size:9px;margin-top:2px}
-  .tv-slot{height:320px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-  .smtrade{font-family:var(--mono);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid rgba(29,37,51,.5)}
-  .smtrade .b{color:var(--rise)} .smtrade .s{color:var(--fall)}
-  /* paper portfolio drawer */
-  .paperbtn{font-family:var(--mono);font-size:11px;color:var(--rise);border:1px solid rgba(61,220,151,.3);border-radius:20px;padding:5px 11px;cursor:pointer}
-  .paperbtn:hover{color:var(--ink);border-color:var(--rise)}
-  .drawer{position:fixed;top:0;right:0;width:380px;max-width:92vw;height:100vh;background:var(--panel);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .25s ease;z-index:60;overflow-y:auto;padding:20px}
-  .drawer.show{transform:translateX(0)}
-  .drawer h3{font-size:15px;margin-bottom:2px}
-  .drawer .dclose{float:right;cursor:pointer;color:var(--faint);font-family:var(--mono)}
-  .simbadge{font-family:var(--mono);font-size:10px;color:var(--warn);background:rgba(255,180,84,.06);border-left:2px solid var(--warn);padding:8px 10px;border-radius:4px;line-height:1.45;margin:12px 0}
-  .pstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:4px 0;color:var(--dim)}
-  .pstat b{color:var(--ink)}
-  .ptable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10.5px;margin-top:8px}
-  .ptable th,.ptable td{text-align:right;padding:4px 6px;border-top:1px solid var(--line);color:var(--dim)}
-  .ptable th{color:var(--faint);text-transform:uppercase;font-size:9px;letter-spacing:.06em}
-  .ptable td.l,.ptable th.l{text-align:left}
-  .pclose{cursor:pointer;color:var(--fall);font-size:10px}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#F4F3EF;font-family:'Schibsted Grotesk',system-ui,sans-serif;color:#17171C;-webkit-font-smoothing:antialiased}
+  button,select,input{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#d9d7cf;border-radius:6px;border:2px solid #F4F3EF}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes tidepulse{0%{box-shadow:0 0 0 0 rgba(22,128,143,.5)}70%{box-shadow:0 0 0 5px rgba(22,128,143,0)}100%{box-shadow:0 0 0 0 rgba(22,128,143,0)}}
+  @keyframes toastin{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .modalbg{position:fixed;inset:0;background:rgba(20,20,20,.4);display:none;align-items:flex-start;justify-content:center;z-index:80;padding:40px 16px;overflow:auto}
+  .modalbg.show{display:flex}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <div class="brand"><span class="mark">Tide</span><h1>Predictive Momentum</h1></div>
-      <p class="sub">Top 5 names by a calibrated model estimate of a near-term +10% move, gated by a downside-safety filter.</p>
-    </div>
-    <div class="status">
-      <div class="pulse"><span class="dot" id="dot"></span><span id="conn">connecting</span></div>
-      <div id="scanInfo" class="flat"></div>
-      <div class="trustbadge" id="trustBadge" onclick="openTrust()">model: –</div>
-      <div class="paperbtn" id="paperBtn" onclick="toggleDrawer()">paper $–</div>
-    </div>
-  </header>
-
-  <p class="note" id="disclaimer">
-    <b>These are model estimates, validated against held-out history — not guarantees.</b>
-    Each pick shows a calibrated probability of rising 10%+ within 1–2 days <b>P(pop)</b> and of not
-    dropping below the current price for ~3 weeks <b>P(safe)</b>. The events that drive large moves are
-    only partly captured by price signals, so estimates are honest but imperfect — the trust badge shows
-    the model's Brier score, base rate, and reliability, and the real empirical record is one click away
-    on every card. Large fast moves are genuinely rare, so the list is often short.
-  </p>
-
-  <div id="banner"></div>
-  <div class="cards" id="cards"><div class="empty">Waiting for first scan…</div></div>
-
-  <footer>
-    Tide ranks a broad cross-sector screened universe. Probabilities are model estimates shown only when
-    calibration and live data clear a quality bar; otherwise the explainable activity score and empirical
-    history are shown instead. Not investment advice.
-  </footer>
-</div>
-
-<div class="modal" id="trustModal" onclick="if(event.target===this)closeTrust()">
-  <div class="mbox" id="trustBox"></div>
-</div>
-
-<div class="drawer" id="drawer">
-  <span class="dclose" onclick="toggleDrawer()">close ✕</span>
-  <h3>Paper portfolio</h3>
-  <div id="drawerBody"><span class="loading">loading…</span></div>
-</div>
+<div id="app"></div>
+<div class="modalbg" id="modal" onclick="if(event.target===this)closeModal()"><div id="modalBox" style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;max-width:560px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.18)"></div></div>
 
 <script>
-// file:// (opened directly) → local backend; otherwise same origin (served by FastAPI / hosted)
+"use strict";
+// ============================================================================
+// Tide — LIVE dashboard, in the Claude Design visual language, wired to the
+// real FastAPI backend. Conviction = calibrated P(+10% in 1-2d), Downside floor
+// = P(no breach of entry over ~3wk), Score = activity composite. The honesty
+// contract is preserved: probabilities show "model est.", are SUPPRESSED when
+// the model isn't display-validated or live data is insufficient, and paper
+// trading is clearly simulated. See the trust badge for Brier / base rate.
+// ============================================================================
 const API = location.protocol === "file:" ? "http://localhost:8000" : location.origin;
-const WS  = API.replace("http","ws") + "/ws/leaderboard";
-const $cards = document.getElementById("cards");
-const $dot = document.getElementById("dot");
-const $conn = document.getElementById("conn");
-const $scan = document.getElementById("scanInfo");
-const $banner = document.getElementById("banner");
+const WS = API.replace(/^http/, "ws") + "/ws/leaderboard";
+const ACCENT = '#16808F', ACCENT_SOFT = '#E2EFF1', CONV_THRESHOLD = 60;
 
-let calib = null;          // /api/calibration payload
-let trustworthy = false;   // global gate
-let openSym = null;
-const analystCache = {};
-const likeCache = {};
+const S = {
+  view: 'scanner', rows: [], payload: {}, calib: null, portfolio: null,
+  selectedId: null, watch: JSON.parse(localStorage.getItem('tide.watch') || '[]'),
+  alerts: JSON.parse(localStorage.getItem('tide.alerts') || '[]'),
+  toasts: [], clock: '', lastBySym: {},
+  form: { stock: '', type: 'priceBelow', value: '' },
+};
+const saveWatch = () => localStorage.setItem('tide.watch', JSON.stringify(S.watch));
+const saveAlerts = () => localStorage.setItem('tide.alerts', JSON.stringify(S.alerts));
 
-function cls(p){ return p>0.05?"rise":p<-0.05?"fall":"flat"; }
-function sign(p){ return (p>=0?"+":"") + p.toFixed(2) + "%"; }
-function pct(x){ return (x===null||x===undefined)?"–":(x*100).toFixed(0)+"%"; }
-function fmtPct(v){ return (v===null||v===undefined)?"–":v.toFixed(1)+"%"; }
-function ago(ts){ if(!ts) return "–"; const s=Math.max(0,Math.round(Date.now()/1000-ts)); return s<90?s+"s":Math.round(s/60)+"m"; }
-
-function loadCalibration(){
-  fetch(API+"/api/calibration").then(r=>r.json()).then(d=>{
-    calib=d;
-    const badge=document.getElementById("trustBadge");
-    if(!d.available){ trustworthy=false; badge.textContent="model: none"; badge.classList.add("bad"); renderBanner(); return; }
-    trustworthy = !!d.trustworthy;
-    const b = d.validation && d.validation.pop ? d.validation.pop.brier : null;
-    badge.textContent = "model "+(d.synthetic?"(synthetic) ":"")+(d.model_version||"")+" · Brier "+(b===null?"–":b);
-    badge.classList.toggle("bad", !trustworthy);
-    renderBanner();
-  }).catch(()=>{});
+// ---- helpers ----
+const fp = p => '$' + (p == null ? '–' : p.toFixed(2));
+const fpct = x => (x >= 0 ? '+' : '') + x.toFixed(2) + '%';
+const dirColor = x => x >= 0 ? '#11A06B' : '#E0504F';
+const convColor = c => c == null ? '#A0A0A8' : c >= 75 ? '#0E8C5A' : c >= 60 ? '#16808F' : c >= 45 ? '#C98A1E' : '#A0A0A8';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function hashColors(t) {
+  const pal = [['#E3F0F2', '#0E6B78'], ['#EAE6F8', '#5B43B5'], ['#E7F2E8', '#1F7A45'], ['#FBEAE3', '#B5552B'], ['#E5EEFA', '#27518F'], ['#F7E9F0', '#9E3267'], ['#FCF1DC', '#9A6B12'], ['#E6F1F6', '#2A6E8E']];
+  let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % pal.length; return pal[h];
 }
-
-function renderBanner(){
-  if(calib && calib.available && !trustworthy){
-    $banner.innerHTML = `<div class="banner">Model present but not yet validated to display-quality calibration — showing the activity score and empirical history instead of headline probabilities.</div>`;
-  } else if(calib && calib.synthetic){
-    $banner.innerHTML = `<div class="banner">Running on a <b>synthetic</b> model artifact (no market data). Probabilities demonstrate the pipeline, not real forecasts.</div>`;
-  } else { $banner.innerHTML=""; }
+function spark(hist, W, H) {
+  if (!hist || hist.length < 2) return '';
+  const lo = Math.min(...hist), hi = Math.max(...hist), r = hi - lo || 1;
+  return hist.map((p, i) => (i / (hist.length - 1) * W).toFixed(1) + ',' + (H - 3 - (p - lo) / r * (H - 6)).toFixed(1)).join(' ');
 }
+// honesty gate: only treat a probability as displayable when the model is
+// display-validated AND this row has sufficient live data.
+const trustworthy = () => !!(S.calib && S.calib.available && S.calib.trustworthy);
+function gated(row) { const p = row.prediction || {}; return trustworthy() && p.available && p.data_sufficient && p.p_pop != null; }
+const conv = row => gated(row) ? row.prediction.p_pop * 100 : null;       // P(pop) %
+const floorVal = row => gated(row) ? (row.prediction.p_safe ?? 0) * 100 : null; // P(safe) %
+const baseRate = () => { try { return S.calib.validation.pop.base_rate * 100; } catch (e) { return null; } };
 
-function baseRatePop(){ try{ return calib.validation.pop.base_rate; }catch(e){ return null; } }
-
-function gaugeHTML(pred){
-  const showProb = trustworthy && pred && pred.available && pred.data_sufficient && pred.p_pop!==null;
-  if(!showProb){
-    let why = "model unavailable";
-    if(pred && !pred.data_sufficient) why = "insufficient live data to estimate";
-    else if(calib && calib.available && !trustworthy) why = "model not display-validated";
-    return `<div class="unavail">${why}<br><span class="flat">ranked by activity score</span></div>`;
-  }
-  const br = baseRatePop();
-  const mult = (br && br>0) ? (pred.p_pop/br) : null;
-  const brTxt = mult ? `${(pred.p_pop*100).toFixed(0)}% — ${mult.toFixed(1)}× base rate (${(br*100).toFixed(0)}%)` : `model estimate`;
-  const safePass = pred.safe_gate_passed;
-  return `<div class="gauges">
-    <div class="gauge">
-      <div class="glbl">P(pop) +10% / 1-2d <span class="est">model est.</span></div>
-      <div class="gval ${pred.p_pop>= (br?br*1.5:.1) ?'rise':''}">${pct(pred.p_pop)}</div>
-      <div class="gmeta">${brTxt}</div>
-    </div>
-    <div class="gauge">
-      <div class="glbl">P(safe) ~3wk</div>
-      <div class="gval">${pct(pred.p_safe)}</div>
-      <div class="gmeta ${safePass?'pass':'fail'}">${safePass?'passes downside filter':'below downside filter'}</div>
-    </div>
-  </div>`;
-}
-
-function driversHTML(pred){
-  if(!pred || !pred.contributions || !pred.contributions.length) return "";
-  const items = pred.contributions.map(c=>{
-    const cl = c.value>=0?"pos":"neg";
-    return `<span class="driver">${c.feature.replace(/_/g," ")} <b class="${cl}">${c.value>=0?"+":""}${c.value.toFixed(2)}</b></span>`;
-  }).join("");
-  return `<div class="drivers">${items}</div>`;
-}
-
-function render(rows, payload){
-  $scan.textContent = "last full scan "+ago(payload.last_screen_ts)+" ago";
-  if(!rows || !rows.length){ $cards.innerHTML=`<div class="empty">No names currently clear the filters — that's expected; large fast moves are rare.</div>`; return; }
-  $cards.innerHTML = rows.map((r,i)=>{
-    const cat = r.catalyst_note ? `<div class="cat">${r.catalyst_note}</div>`:"";
-    return `<div class="card" data-sym="${r.symbol}">
-      <div class="chead">
-        <div class="rank">${i+1}</div>
-        <div class="idblock"><div class="sym">${r.symbol}</div><div class="sector">${r.sector}</div>${cat}${smBadge(r.smart_money)}</div>
-        <div class="px"><div class="last">$${r.last.toFixed(2)}</div><div class="sess ${cls(r.session_pct)}">${sign(r.session_pct)}</div></div>
-        ${gaugeHTML(r.prediction)}
-        ${armBtnHTML(r)}
-        <span class="chev">›</span>
-      </div>
-      <div class="body">
-        ${driversHTML(r.prediction)}
-        <div class="section"><h4>Analyst note</h4><div class="analyst-slot"><span class="loading">expand to load…</span></div></div>
-        <div class="section sm-section"><h4>Smart money — congressional trades</h4><div class="sm-slot"></div></div>
-        <div class="section"><h4>Price chart <span class="flat" style="font-weight:400">· TradingView</span></h4><div class="tv-slot" data-sym="${r.symbol}"></div></div>
-        <div class="section"><h4>Real historical record</h4><div class="empirical-slot"></div></div>
-      </div>
-    </div>`;
-  }).join("");
-  $cards.querySelectorAll(".card").forEach(card=>{
-    card.querySelector(".chead").onclick=()=>toggle(card);
-    const ab=card.querySelector(".arm");
-    if(ab) ab.onclick=(e)=>{ e.stopPropagation(); armTrade(card.dataset.sym, ab); };
+// ============================ data ============================
+function applyAlerts() {
+  const fired = [];
+  S.alerts = S.alerts.map(al => {
+    if (!al.armed || al.triggered) return al;
+    const r = S.lastBySym[al.stock]; if (!r) return al;
+    const c = conv(r); let hit = false;
+    if (al.type === 'priceAbove') hit = r.last >= al.value;
+    else if (al.type === 'priceBelow') hit = r.last <= al.value;
+    else if (al.type === 'convAbove') hit = c != null && c >= al.value;
+    if (hit) { fired.push({ ...al, px: r.last }); return { ...al, triggered: true }; }
+    return al;
   });
-  if(openSym){ const c=$cards.querySelector(`.card[data-sym="${openSym}"]`); if(c) openCard(c,true); }
+  if (fired.length) {
+    saveAlerts();
+    fired.forEach(f => pushToast(f.stock + ' alert triggered', condText(f) + ' — now ' + fp(f.px)));
+  }
 }
+function ingest(payload) {
+  S.payload = payload; S.rows = payload.rows || [];
+  S.rows.forEach(r => { S.lastBySym[r.symbol] = r; });
+  if (!S.selectedId && S.rows[0]) S.selectedId = S.rows[0].symbol;
+  applyAlerts();
+  if (S.view === 'scanner') renderView();
+  else if (S.view === 'watch') renderView();
+  else if (S.view === 'alerts') { const l = document.getElementById('alertList'); if (l) l.innerHTML = alertsListHTML(); }
+}
+function loadCalib() {
+  fetch(API + '/api/calibration').then(r => r.json()).then(d => { S.calib = d; renderTrust(); if (S.view === 'scanner') renderView(); }).catch(() => {});
+}
+function loadPortfolio() {
+  fetch(API + '/api/paper/portfolio').then(r => r.json()).then(d => {
+    S.portfolio = d; renderTrust();
+    if (S.view === 'paper') { const b = document.getElementById('paperBody'); if (b) b.innerHTML = paperBodyHTML(); }
+  }).catch(() => {});
+}
+function pushToast(title, body) {
+  const id = 'to' + Math.random(); S.toasts = [{ id, title, body }, ...S.toasts].slice(0, 4); renderToasts();
+  setTimeout(() => { S.toasts = S.toasts.filter(t => t.id !== id); renderToasts(); }, 5200);
+}
+function condText(a) {
+  if (a.type === 'priceAbove') return 'Price above ' + fp(a.value);
+  if (a.type === 'priceBelow') return 'Price at/below ' + fp(a.value);
+  return 'Conviction above ' + Math.round(a.value) + '%';
+}
+function featured() { return S.rows.find(r => r.symbol === S.selectedId) || S.rows[0] || null; }
 
-function armBtnHTML(r){
-  const p=r.prediction;
-  const ok = p && p.available && p.data_sufficient && p.safe_gate_passed && trustworthy;
-  if(!ok) return "";
-  return `<button class="arm">Arm paper trade<small>target +10% · stop −5% · sim</small></button>`;
-}
-function smBadge(sm){
-  if(!sm || !sm.available || (sm.net===0)) return "";
-  const buy = sm.net>0;
-  return `<span class="smbadge ${buy?'':'sell'}">${buy?'▲':'▼'} ${Math.abs(sm.net)} net congress ${buy?'buys':'sells'}</span>`;
-}
-async function armTrade(sym, btn){
-  if(btn){ btn.disabled=true; btn.textContent="arming…"; }
-  try{
-    const res=await(await fetch(API+"/api/paper/arm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:sym})})).json();
-    if(!res.ok){ alert("Could not arm: "+(res.error||"unknown")); }
-    else { openDrawer(); loadPortfolio(); }
-  }catch(e){ alert("Arm failed — is the backend running?"); }
-  finally{ if(btn){ btn.disabled=false; btn.innerHTML="Arm paper trade<small>target +10% · stop −5% · sim</small>"; } }
-}
-
-function toggle(card){
-  const sym=card.dataset.sym;
-  if(openSym===sym){ card.classList.remove("open"); openSym=null; return; }
-  if(openSym){ const o=$cards.querySelector(`.card[data-sym="${openSym}"]`); if(o)o.classList.remove("open"); }
-  openSym=sym; openCard(card,false);
-}
-
-function openCard(card, silent){
-  card.classList.add("open");
-  const sym=card.dataset.sym;
-  loadAnalyst(card,sym);
-  loadEmpirical(card,sym);
-  loadSmartMoney(card,sym);
-  initTV(card,sym);
-}
-
-const smCache={};
-function loadSmartMoney(card,sym){
-  const sec=card.querySelector(".sm-section"), slot=card.querySelector(".sm-slot");
-  if(!slot) return;
-  const done=(d)=>{
-    if(!d || !d.available){ sec.style.display="none"; return; }
-    sec.style.display="";
-    const trades=(d.trades||[]).map(t=>`<div class="smtrade"><span><span class="${t.side==='buy'?'b':'s'}">${t.side.toUpperCase()}</span> ${t.name||'—'}</span><span>${t.amount||''} · ${t.transaction_date||''}${t.lag_days!=null?` · disclosed ${t.lag_days}d later`:''}</span></div>`).join("");
-    slot.innerHTML=`<div class="meta" style="color:var(--dim);font-size:11px;margin-bottom:6px">Net ${d.net>=0?'+':''}${d.net} (${d.buys} buys / ${d.sells} sells, ${d.lookback_days}d)</div>${trades||'<span class="loading">no disclosed trades in window</span>'}<div class="caveat" style="margin-top:8px">⚠ ${d.caveat||''}</div>`;
+// ============================ header ============================
+function headerHTML() {
+  const nav = (v, label, badge) => {
+    const on = S.view === v;
+    return `<button data-act="go" data-v="${v}" style="border:none;cursor:pointer;font-size:13px;font-weight:600;padding:7px 15px;border-radius:8px;background:${on ? '#fff' : 'transparent'};color:${on ? '#17171C' : '#7A7982'};box-shadow:${on ? '0 1px 2px rgba(0,0,0,.08)' : 'none'};display:flex;align-items:center;gap:6px">${label}${badge || ''}</button>`;
   };
-  if(smCache[sym]){ done(smCache[sym]); return; }
-  sec.style.display="none";
-  fetch(API+"/api/smartmoney/"+sym).then(r=>r.json()).then(d=>{ smCache[sym]=d; if(openSym===sym) done(d); }).catch(()=>{ sec.style.display="none"; });
+  const triggered = S.alerts.filter(a => a.triggered).length;
+  const aBadge = triggered ? `<span style="background:#E0504F;color:#fff;font-size:10px;font-weight:700;border-radius:20px;padding:1px 6px;font-family:'JetBrains Mono',monospace">${triggered}</span>` : '';
+  const live = !!S.payload.ts;
+  return `<header style="position:sticky;top:0;z-index:40;background:rgba(244,243,239,.88);backdrop-filter:blur(12px);border-bottom:1px solid #E4E2DA">
+    <div style="max-width:1340px;margin:0 auto;padding:0 28px;height:62px;display:flex;align-items:center;gap:24px">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:31px;height:31px;border-radius:9px;background:${ACCENT};display:flex;align-items:center;justify-content:center">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M2 14c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 19c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg>
+        </div>
+        <div style="font-weight:800;font-size:19px;letter-spacing:-.03em">Tide</div>
+      </div>
+      <nav style="display:flex;gap:3px;background:#ECEAE2;padding:4px;border-radius:11px">${nav('scanner', 'Scanner')}${nav('watch', 'Watchlist')}${nav('alerts', 'Alerts', aBadge)}${nav('paper', 'Paper')}</nav>
+      <div style="flex:1"></div>
+      <div id="trustBadge"></div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#5C5B64;font-weight:500">
+        <span style="width:8px;height:8px;border-radius:50%;background:${live ? '#11A06B' : '#B7B6AE'};animation:${live ? 'tidepulse 2s infinite' : 'none'}"></span>
+        <span id="clock" style="font-family:'JetBrains Mono',monospace;letter-spacing:-.01em">${S.clock}</span>
+      </div>
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#22323a,#4a6b74);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">AD</div>
+    </div>
+  </header>`;
+}
+function renderTrust() {
+  const el = document.getElementById('trustBadge'); if (!el) return;
+  const c = S.calib;
+  let label, color, bd;
+  if (!c || !c.available) { label = 'model: none'; color = '#C98A1E'; bd = 'rgba(201,138,30,.4)'; }
+  else {
+    const b = (c.validation && c.validation.pop) ? c.validation.pop.brier : null;
+    label = (c.synthetic ? 'synthetic · ' : '') + 'Brier ' + (b == null ? '–' : b);
+    color = c.trustworthy && !c.synthetic ? '#0E6B78' : '#C98A1E';
+    bd = c.trustworthy && !c.synthetic ? 'rgba(22,128,143,.35)' : 'rgba(201,138,30,.4)';
+  }
+  const eq = S.portfolio ? ' · paper $' + Math.round(S.portfolio.equity).toLocaleString() : '';
+  el.innerHTML = `<button data-act="trust" style="border:1px solid ${bd};background:#fff;color:${color};font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer">${esc(label)}${eq}</button>`;
 }
 
-function initTV(card,sym){
-  const slot=card.querySelector(".tv-slot");
-  if(!slot || slot.dataset.loaded) return;
-  slot.dataset.loaded="1";
-  slot.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
-  const s=document.createElement("script");
-  s.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-  s.async=true;
-  s.innerHTML=JSON.stringify({symbol:sym,interval:"D",theme:"dark",style:"1",locale:"en",autosize:true,hide_top_toolbar:false,allow_symbol_change:false});
-  slot.querySelector(".tradingview-widget-container").appendChild(s);
+// ============================ scanner ============================
+function bannerHTML() {
+  if (!S.calib) return '';
+  if (!S.calib.available) return banner('No trained model loaded — ranking by activity score; probabilities are hidden until a calibrated model is trained.');
+  if (S.calib.synthetic) return banner('Running on a <b>synthetic</b> model — probabilities demonstrate the pipeline, not real forecasts.');
+  if (!S.calib.trustworthy) return banner('Model present but below display-quality calibration — showing the activity score instead of headline probabilities.');
+  return '';
+}
+function banner(msg) { return `<div style="background:rgba(201,138,30,.08);border:1px solid rgba(201,138,30,.25);border-radius:12px;padding:11px 15px;font-size:12.5px;color:#9A6B12;margin-bottom:16px;line-height:1.5">${msg}</div>`; }
+
+function scannerHTML() {
+  const rows = S.rows;
+  const qualified = rows.filter(r => { const c = conv(r); return c != null && c >= CONV_THRESHOLD; }).length;
+  const f = featured();
+  if (!rows.length) {
+    return `${bannerHTML()}<div style="background:#fff;border:1px dashed #DAD8D0;border-radius:16px;padding:54px;text-align:center;color:#9C9CA6"><div style="font-size:15px;font-weight:600;color:#6E6E78;margin-bottom:4px">No names currently clear the filters</div><div style="font-size:13px">That's expected — genuine +10% moves in 1–2 days are rare. Waiting for the next scan…</div></div>`;
+  }
+  const rowHTML = rows.map((s, i) => {
+    const [bg, fg] = hashColors(s.symbol);
+    const watched = S.watch.includes(s.symbol), top3 = i < 3;
+    const c = conv(s), fl = floorVal(s);
+    const convCell = c == null
+      ? `<span style="font-size:11.5px;color:#A0A0A8">n/a · activity rank</span>`
+      : `<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#F0EEE7;border-radius:4px;overflow:hidden;min-width:60px"><div style="height:100%;border-radius:4px;width:${Math.round(c)}%;background:${convColor(c)}"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:${convColor(c)};min-width:34px">${Math.round(c)}%</span><span style="font-size:11px;color:#11A06B">${c >= CONV_THRESHOLD ? '✓' : ''}</span></div>`;
+    const sm = s.smart_money && s.smart_money.available && s.smart_money.net ? `<span title="net congressional buys" style="margin-left:6px;font-size:10px;font-weight:700;color:${s.smart_money.net > 0 ? '#0E8C5A' : '#E0504F'}">${s.smart_money.net > 0 ? '▲' : '▼'}${Math.abs(s.smart_money.net)}</span>` : '';
+    return `<tr data-act="select" data-id="${s.symbol}" style="border-top:1px solid #F1EFE8;cursor:pointer;background:${f && f.symbol === s.symbol ? ACCENT_SOFT : 'transparent'}">
+      <td style="padding:13px 12px 13px 20px"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;background:${top3 ? ACCENT_SOFT : '#F1EFE8'};color:${top3 ? ACCENT : '#8B8A93'}">${i + 1}</span></td>
+      <td style="padding:13px 12px"><div style="display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:8px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">${esc(s.symbol.slice(0, 2))}</div><div><div style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">${esc(s.symbol)}${sm}</div><div style="font-size:11.5px;color:#9C9CA6">${esc(s.sector)}</div></div></div></td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:${dirColor(s.session_pct)}">${fp(s.last)}</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${dirColor(s.session_pct)}">${fpct(s.session_pct)}</td>
+      <td style="padding:13px 12px;min-width:150px">${convCell}</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#11A06B">+10%</td>
+      <td style="padding:13px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:${fl == null ? '#A0A0A8' : fl >= 55 ? '#11A06B' : '#C98A1E'}">${fl == null ? 'n/a' : Math.round(fl) + '%'}</td>
+      <td style="padding:13px 12px;text-align:center"><svg width="78" height="26" viewBox="0 0 78 26" preserveAspectRatio="none" style="display:block;margin:0 auto"><polyline points="${spark(s.sparkline, 78, 26)}" fill="none" stroke="${s.session_pct >= 0 ? '#11A06B' : '#E0504F'}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></td>
+      <td style="padding:13px 12px;text-align:right"><span style="display:inline-block;min-width:34px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${s.composite >= 60 ? '#fff' : '#5C5B64'};background:${s.composite >= 60 ? ACCENT : '#EEECE5'};padding:3px 8px;border-radius:7px">${Math.round(s.composite)}</span></td>
+      <td style="padding:13px 20px 13px 12px;text-align:right"><button data-act="watch" data-id="${s.symbol}" title="Toggle watchlist" style="border:none;background:none;cursor:pointer;font-size:16px;color:${watched ? '#E0A92E' : '#C9C7C0'};padding:2px">${watched ? '★' : '☆'}</button></td>
+    </tr>`;
+  }).join('');
+
+  return `${bannerHTML()}
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${ACCENT};margin-bottom:5px">Real-time opportunity scan</div>
+        <h1 style="margin:0;font-size:27px;font-weight:800;letter-spacing:-.025em">Prospective Leaderboard</h1>
+        <p style="margin:6px 0 0;font-size:13.5px;color:#6E6E78;max-width:600px;line-height:1.5">Ranked by a calibrated <strong style="color:#43424A">conviction of +10% inside 24–48h</strong>, gated by a downside-floor confidence that price holds above entry for ~3 weeks. Conviction and floor are <b>model estimates</b> — see the trust badge.</p>
+      </div>
+      <div style="display:flex;gap:18px;align-items:center">
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${ACCENT};line-height:1">${trustworthy() ? qualified : '—'}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Qualified signals</div></div>
+        <div style="width:1px;height:38px;background:#E4E2DA"></div>
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1">${(S.payload.model_loaded === false) ? '—' : rows.length}</div><div style="font-size:11px;color:#8B8A93;font-weight:600;letter-spacing:.03em;text-transform:uppercase">Live signals</div></div>
+      </div>
+    </div>
+    ${f ? featuredHTML(f) : ''}
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #EEECE5;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:14px;font-weight:700">Live leaderboard</span><span style="font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT_SOFT};padding:3px 9px;border-radius:20px">top ${rows.length}</span></div>
+        <span style="font-size:11.5px;color:#9C9CA6">last full scan ${ago(S.payload.last_screen_ts)} ago</span>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:920px">
+        <thead><tr style="background:#FAF9F6">
+          ${['#', 'Symbol', 'Price', '24h', 'Conviction', 'Target', 'Floor', '7d', 'Score', ''].map((h, i) => `<th style="text-align:${i <= 1 || i === 4 ? 'left' : i === 7 || i === 8 && false ? 'center' : 'right'};padding:11px ${i === 0 ? '12px 11px 20px' : i === 9 ? '11px 20px 11px 12px' : '12px'};font-size:11px;font-weight:600;color:#9C9CA6;letter-spacing:.04em;text-transform:uppercase">${h}</th>`).join('')}
+        </tr></thead>
+        <tbody>${rowHTML}</tbody>
+      </table></div>
+    </div>
+    ${footerHTML()}`;
 }
 
-function loadAnalyst(card,sym){
-  const slot=card.querySelector(".analyst-slot");
-  if(!slot) return;
-  if(analystCache[sym]){ slot.innerHTML=analystHTML(analystCache[sym]); return; }
-  slot.innerHTML=`<span class="loading">writing analyst note…</span>`;
-  fetch(API+"/api/analyst/"+sym).then(r=>r.json()).then(d=>{
-    analystCache[sym]=d;
-    if(openSym===sym) slot.innerHTML=analystHTML(d);
-  }).catch(()=>{ slot.innerHTML=`<div class="errbox">Could not reach the analyst service.</div>`; });
-}
-function analystHTML(d){
-  if(!d.available) return `<div class="loading">${d.reason||"analyst notes disabled"}</div>`;
-  const cav=(d.caveats||[]).map(c=>`<div class="caveat">⚠ ${c}</div>`).join("");
-  const flag=d.flagged?`<div class="caveat">⚠ A figure in this note could not be matched to the source stats and may be unreliable.</div>`:"";
-  const news=(d.news||[]).length?`<div class="news">${d.news.map(n=>`<a href="${n.url}" target="_blank" rel="noopener">${n.title} — <span class="flat">${n.publisher}</span></a>`).join("")}</div>`:"";
-  return `<div class="analyst">${d.note||""}</div>${cav}${flag}${news}`;
-}
-
-function loadEmpirical(card,sym){
-  const slot=card.querySelector(".empirical-slot");
-  if(!slot) return;
-  if(likeCache[sym]){ slot.innerHTML=empHTML(likeCache[sym]); return; }
-  slot.innerHTML=`<span class="loading">computing from real history…</span>`;
-  fetch(API+"/api/likelihood/"+sym).then(r=>r.json()).then(d=>{
-    likeCache[sym]=d;
-    if(openSym===sym) slot.innerHTML=empHTML(d);
-  }).catch(()=>{ slot.innerHTML=`<div class="errbox">History service unavailable.</div>`; });
-}
-function empHTML(d){
-  if(d.error) return `<div class="errbox">No real history yet.<br>${d.error}</div>`;
-  if(!d.n) return `<div class="errbox">No comparable historical setups for ${d.symbol}. Nothing to report honestly.</div>`;
-  const thin=d.n<12;
-  return `<div class="panel">
-    <div><div class="lbl">Hit +${d.target_pct}% in ${d.horizon_days}d</div><div class="big ${d.freq_target>=20?'rise':''}">${fmtPct(d.freq_target)}</div><div class="meta ${thin?'warn':''}">n = ${d.n}${thin?' · thin, treat as noise':''}</div></div>
-    <div><div class="lbl">Median forward return</div><div class="big ${d.median_fwd>0?'rise':d.median_fwd<0?'fall':''}">${d.median_fwd>0?'+':''}${d.median_fwd}%</div><div class="meta">25th–75th: ${d.p25_fwd}% to ${d.p75_fwd}%</div></div>
-    <div><div class="lbl">Round-trip to entry (≤3wk)</div><div class="big">${fmtPct(d.recover_rate)}</div><div class="meta">of cases that first dropped below entry</div></div>
-    <div class="full"><b>What this is:</b> across ${d.n} past days where ${d.symbol} looked like it does now, this is what actually happened — an empirical frequency, not a forecast. The model estimate above is checked against this.</div>
+function featuredHTML(f) {
+  const [bg, fg] = hashColors(f.symbol);
+  const fwatched = S.watch.includes(f.symbol);
+  const c = conv(f), fl = floorVal(f), br = baseRate();
+  const armable = gated(f) && (f.prediction.safe_gate_passed !== false);
+  const gauges = [
+    { label: 'Upside conviction', val: c == null ? 'n/a' : Math.round(c) + '%', vc: convColor(c), pct: c == null ? 0 : Math.round(c), color: convColor(c), detail: c == null ? 'Suppressed — model not display-validated or insufficient live data.' : 'P(+10% within 24–48h)' + (br ? ' · ' + (c / br).toFixed(1) + '× the ' + Math.round(br) + '% base rate' : '') },
+    { label: 'Projected target', val: '+10%', vc: '#11A06B', pct: 50, color: '#11A06B', detail: 'The move the model is scoring the probability of.' },
+    { label: 'Downside floor', val: fl == null ? 'n/a' : Math.round(fl) + '%', vc: fl == null ? '#A0A0A8' : fl >= 55 ? '#11A06B' : '#C98A1E', pct: fl == null ? 0 : Math.round(fl), color: fl == null ? '#D9D7CF' : fl >= 55 ? '#11A06B' : '#C98A1E', detail: 'P(price holds above entry for ~3 weeks).' },
+  ].map(g => `<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:12.5px;font-weight:600;color:#43424A">${g.label} <span style="font-size:9px;font-weight:700;color:${ACCENT};background:${ACCENT_SOFT};padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em">model est.</span></span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${g.vc}">${g.val}</span></div><div style="height:7px;background:#F0EEE7;border-radius:5px;overflow:hidden"><div style="height:100%;border-radius:5px;width:${g.pct}%;background:${g.color}"></div></div><div style="font-size:11px;color:#9C9CA6;margin-top:5px;line-height:1.4">${g.detail}</div></div>`).join('');
+  const factors = ((f.prediction && f.prediction.contributions) || []).slice(0, 3).map(x => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:${x.value >= 0 ? '#11A06B' : '#E0504F'}"></span><span style="font-size:12.5px;color:#43424A;flex:1">${esc(x.feature.replace(/_/g, ' '))}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#6E6E78">${x.value >= 0 ? '+' : ''}${x.value.toFixed(2)}</span></div>`).join('') || '<div style="font-size:12px;color:#9C9CA6">No model contributions (running on activity score).</div>';
+  const ch = f.session_pct;
+  return `<div style="display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:20px">
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div style="display:flex;gap:14px;align-items:center"><div style="width:46px;height:46px;border-radius:12px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">${esc(f.symbol.slice(0, 2))}</div>
+          <div><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span style="font-size:20px;font-weight:800;letter-spacing:-.02em">${esc(f.symbol)}</span><span style="font-size:11px;font-weight:600;color:#6E6E78;background:#F1EFE8;padding:3px 8px;border-radius:6px">${esc(f.sector)}</span><span style="font-size:11px;font-weight:700;color:#fff;background:${ACCENT};padding:3px 8px;border-radius:6px;letter-spacing:.02em">TOP SIGNAL</span></div>
+          ${f.catalyst_note ? `<div style="font-size:12px;color:#9E3267;margin-top:4px">${esc(f.catalyst_note)}</div>` : ''}</div></div>
+        <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:700;line-height:1;color:${dirColor(ch)}">${fp(f.last)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;margin-top:3px;color:${dirColor(ch)}">${fpct(ch)}</div></div>
+      </div>
+      <div class="tv-slot" data-sym="${esc(f.symbol)}" style="height:230px;border:1px solid #EEECE5;border-radius:10px;overflow:hidden"></div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button data-act="arm" data-id="${f.symbol}" ${armable ? '' : 'disabled'} title="${armable ? 'Open a simulated paper position (target +10%, stop −5%)' : 'Enabled only when the gated probability is shown'}" style="flex:1.4;height:38px;border-radius:10px;border:none;background:${armable ? ACCENT : '#E7E5DE'};color:${armable ? '#fff' : '#A9A8A0'};font-weight:700;font-size:13px;cursor:${armable ? 'pointer' : 'not-allowed'}">Arm paper trade · +10% / −5%</button>
+        <button data-act="watchF" data-id="${f.symbol}" style="flex:1;height:38px;border-radius:10px;border:1px solid ${fwatched ? ACCENT : '#E0DED5'};background:${fwatched ? ACCENT_SOFT : '#fff'};color:${fwatched ? ACCENT : '#3A3942'};font-weight:600;font-size:13px;cursor:pointer">${fwatched ? '★ Watching' : '☆ Watch'}</button>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:700;margin-bottom:2px">Signal thesis</div>
+      <div style="font-size:12px;color:#8B8A93;margin-bottom:16px">Activity score <strong style="color:${ACCENT};font-family:'JetBrains Mono',monospace">${Math.round(f.composite)}</strong> / 100</div>
+      ${gauges}
+      <div style="border-top:1px dashed #E4E2DA;margin:6px 0 13px"></div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9C9CA6;margin-bottom:9px">Why it ranked</div>
+      ${factors}
+      <div style="margin-top:auto;display:flex;gap:8px;padding-top:12px">
+        <button data-act="analyst" data-id="${f.symbol}" style="flex:1;height:32px;border-radius:8px;border:1px solid #E0DED5;background:#fff;color:#3A3942;font-size:12px;font-weight:600;cursor:pointer">Analyst note</button>
+        <button data-act="history" data-id="${f.symbol}" style="flex:1;height:32px;border-radius:8px;border:1px solid #E0DED5;background:#fff;color:#3A3942;font-size:12px;font-weight:600;cursor:pointer">Real history</button>
+      </div>
+    </div>
   </div>`;
 }
 
-function openTrust(){
-  const m=document.getElementById("trustModal"), box=document.getElementById("trustBox");
-  let h=`<span class="mclose" onclick="closeTrust()">close ✕</span><h3>Model trust</h3>`;
-  if(!calib || !calib.available){ h+=`<p class="loading" style="margin-top:10px">No model artifact loaded — the leaderboard is ranking by the activity score.</p>`; }
-  else{
-    const v=calib.validation||{}; const pop=v.pop||{}, safe=v.safe||{};
-    h+=`<p class="meta" style="color:var(--dim);font-size:12px;margin:6px 0 12px;line-height:1.5">Version <b style="color:var(--ink)">${calib.model_version||'–'}</b>${calib.synthetic?' · <span style="color:var(--warn)">synthetic data</span>':''} · ${calib.trustworthy?'<span style="color:var(--rise)">display-validated</span>':'<span style="color:var(--warn)">below display threshold</span>'}</p>`;
-    h+=`<table class="reltable"><tr><th>head</th><th>n</th><th>base rate</th><th>Brier</th><th>AP</th><th>prec@5</th></tr>`;
-    [["pop",pop],["safe",safe]].forEach(([k,m2])=>{
-      h+=`<tr><td style="text-align:left;color:var(--ink)">${k}</td><td>${m2.n||'–'}</td><td>${m2.base_rate!=null?(m2.base_rate*100).toFixed(1)+'%':'–'}</td><td>${m2.brier??'–'}</td><td>${m2.average_precision??'–'}</td><td>${m2.precision_at_k?(m2.precision_at_k['5']??'–'):'–'}</td></tr>`;
-    });
-    h+=`</table>`;
-    if(pop.reliability&&pop.reliability.length){
-      h+=`<h3 style="font-size:13px;margin-top:16px">Reliability — P(pop) predicted vs observed</h3><table class="reltable"><tr><th>bin</th><th>predicted</th><th>observed</th><th>n</th></tr>`;
-      pop.reliability.forEach(b=>{ h+=`<tr><td style="text-align:left">${b.bin}</td><td>${(b.predicted*100).toFixed(1)}%</td><td>${(b.observed*100).toFixed(1)}%</td><td>${b.n}</td></tr>`; });
-      h+=`</table>`;
-    }
-    if(calib.feature_skew_note) h+=`<p class="meta" style="color:var(--faint);font-size:11px;margin-top:14px;line-height:1.5">${calib.feature_skew_note}</p>`;
+// ============================ watchlist ============================
+function watchHTML() {
+  const cards = S.watch.map(sym => {
+    const s = S.lastBySym[sym], [bg, fg] = hashColors(sym);
+    if (!s) return `<div style="background:#fff;border:1px solid #E8E6DF;border-radius:14px;padding:17px 18px;box-shadow:0 1px 2px rgba(0,0,0,.03)"><div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:11px;align-items:center"><div style="width:36px;height:36px;border-radius:9px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">${esc(sym.slice(0, 2))}</div><div><div style="font-size:15px;font-weight:800">${esc(sym)}</div><div style="font-size:11.5px;color:#9C9CA6">not in current scan</div></div></div><button data-act="unwatch" data-id="${sym}" style="border:none;background:none;cursor:pointer;color:#BDBBB4;font-size:18px">×</button></div><div style="font-size:12px;color:#9C9CA6;margin-top:12px">Awaiting the next broad scan to refresh live data for this symbol.</div></div>`;
+    const ch = s.session_pct, c = conv(s);
+    return `<div style="background:#fff;border:1px solid #E8E6DF;border-radius:14px;padding:17px 18px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div data-act="selectGo" data-id="${sym}" style="display:flex;gap:11px;align-items:center;cursor:pointer"><div style="width:36px;height:36px;border-radius:9px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">${esc(sym.slice(0, 2))}</div><div><div style="font-size:15px;font-weight:800;letter-spacing:-.02em">${esc(sym)}</div><div style="font-size:11.5px;color:#9C9CA6">${esc(s.sector)}</div></div></div><button data-act="unwatch" data-id="${sym}" title="Remove" style="border:none;background:none;cursor:pointer;color:#BDBBB4;font-size:18px;line-height:1;padding:2px">×</button></div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px"><div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:${dirColor(ch)}">${fp(s.last)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${dirColor(ch)}">${fpct(ch)}</div></div><svg width="92" height="34" viewBox="0 0 92 34" preserveAspectRatio="none"><polyline points="${spark(s.sparkline, 92, 34)}" fill="none" stroke="${ch >= 0 ? '#11A06B' : '#E0504F'}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div style="display:flex;gap:8px"><div style="flex:1;background:#FAF9F6;border-radius:9px;padding:8px 10px"><div style="font-size:10px;color:#9C9CA6;font-weight:600;text-transform:uppercase">Conviction</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${convColor(c)}">${c == null ? 'n/a' : Math.round(c) + '%'}</div></div><div style="flex:1;background:#FAF9F6;border-radius:9px;padding:8px 10px"><div style="font-size:10px;color:#9C9CA6;font-weight:600;text-transform:uppercase">Score</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700">${Math.round(s.composite)}</div></div></div>
+    </div>`;
+  }).join('');
+  return `<h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Watchlist</h1>
+    <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">${S.watch.length} symbol${S.watch.length === 1 ? '' : 's'} tracked (saved in this browser) — tap a card to open it in the scanner.</p>
+    ${S.watch.length ? '' : `<div style="background:#fff;border:1px dashed #DAD8D0;border-radius:16px;padding:54px;text-align:center;color:#9C9CA6"><div style="font-size:15px;font-weight:600;color:#6E6E78;margin-bottom:4px">No symbols watched yet</div><div style="font-size:13px">Star any row in the scanner to track it here.</div></div>`}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px">${cards}</div>`;
+}
+
+// ============================ alerts ============================
+function alertsListHTML() {
+  if (!S.alerts.length) return `<div style="padding:48px;text-align:center;color:#9C9CA6"><div style="font-size:14px;font-weight:600;color:#6E6E78;margin-bottom:3px">No alerts yet</div><div style="font-size:13px">Create one with the panel on the right.</div></div>`;
+  return S.alerts.map((a, i) => {
+    const s = S.lastBySym[a.stock], [bg, fg] = hashColors(a.stock);
+    const sFg = a.triggered ? '#fff' : a.armed ? '#0E6B78' : '#8B8A93', sBg = a.triggered ? '#E0504F' : a.armed ? ACCENT_SOFT : '#EEECE5';
+    const c = s ? conv(s) : null;
+    return `<div style="display:flex;align-items:center;gap:14px;padding:15px 18px;border-top:1px solid #F1EFE8;background:${a.triggered ? 'rgba(224,80,79,0.05)' : 'transparent'}">
+      <div style="width:38px;height:38px;border-radius:9px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc(a.stock.slice(0, 2))}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700">${esc(a.stock)} <span style="font-weight:500;color:#8B8A93">${condText(a)}</span></div><div style="font-size:11.5px;color:#9C9CA6;margin-top:2px">${s ? 'Now ' + fp(s.last) + (c != null ? ' · conviction ' + Math.round(c) + '%' : '') : 'awaiting live data'}</div></div>
+      <span style="font-size:11px;font-weight:700;color:${sFg};background:${sBg};padding:4px 10px;border-radius:20px">${a.triggered ? 'Triggered' : a.armed ? 'Armed' : 'Paused'}</span>
+      <button data-act="toggleAlert" data-i="${i}" style="border:1px solid #E0DED5;background:#fff;color:#5C5B64;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer">${a.armed ? 'Pause' : 'Arm'}</button>
+      <button data-act="removeAlert" data-i="${i}" title="Delete" style="border:none;background:none;cursor:pointer;color:#BDBBB4;font-size:18px;line-height:1">×</button>
+    </div>`;
+  }).join('');
+}
+function alertFormHTML() {
+  const opts = (S.rows.length ? S.rows : Object.values(S.lastBySym)).map(s => `<option value="${esc(s.symbol)}" ${s.symbol === S.form.stock ? 'selected' : ''}>${esc(s.symbol)} · ${esc(s.sector)}</option>`).join('');
+  const ft = S.form.type;
+  const types = [['priceAbove', 'Price rises above'], ['priceBelow', 'Price falls to / below'], ['convAbove', 'Conviction rises above']].map(([v, l]) => `<option value="${v}" ${v === ft ? 'selected' : ''}>${l}</option>`).join('');
+  return `<div style="font-size:13.5px;font-weight:700;margin-bottom:14px">New alert</div>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;text-transform:uppercase">Symbol</label>
+    <select data-act="formStock" style="width:100%;height:38px;margin:6px 0 13px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-size:13px;background:#fff">${opts || '<option>—</option>'}</select>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;text-transform:uppercase">Trigger</label>
+    <select data-act="formType" style="width:100%;height:38px;margin:6px 0 13px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-size:13px;background:#fff">${types}</select>
+    <label style="font-size:11px;font-weight:600;color:#8B8A93;text-transform:uppercase">${ft === 'convAbove' ? 'Conviction %' : 'Price ($)'}</label>
+    <input data-act="formValue" value="${esc(S.form.value)}" inputmode="decimal" style="width:100%;height:38px;margin:6px 0 16px;border:1px solid #E0DED5;border-radius:9px;padding:0 10px;font-family:'JetBrains Mono',monospace;font-size:13px" />
+    <button data-act="addAlert" style="width:100%;height:40px;border:none;border-radius:10px;background:${ACCENT};color:#fff;font-weight:700;font-size:13.5px;cursor:pointer">Arm alert</button>
+    <div style="font-size:11px;color:#A9A8A0;margin-top:10px;line-height:1.4">Alerts are stored in this browser and evaluated against the live feed for symbols currently in the scan.</div>`;
+}
+function alertsHTML() {
+  return `<h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Alerts</h1>
+    <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">Arm triggers on price or conviction. The live feed fires them automatically.</p>
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start">
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden"><div id="alertList">${alertsListHTML()}</div></div>
+      <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;padding:18px 19px;box-shadow:0 1px 2px rgba(0,0,0,.03)" id="alertForm">${alertFormHTML()}</div>
+    </div>`;
+}
+
+// ============================ paper ============================
+function paperBodyHTML() {
+  const d = S.portfolio;
+  if (!d) return '<div style="color:#9C9CA6;padding:20px">Loading…</div>';
+  const rc = d.return_pct >= 0 ? '#11A06B' : '#E0504F';
+  const stat = (l, v, c) => `<div style="background:#FAF9F6;border-radius:11px;padding:13px 15px"><div style="font-size:10.5px;color:#9C9CA6;font-weight:600;text-transform:uppercase;letter-spacing:.03em">${l}</div><div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;margin-top:3px;color:${c || '#17171C'}">${v}</div></div>`;
+  const open = (d.open_positions || []).map(p => `<tr style="border-top:1px solid #F1EFE8"><td style="padding:11px 12px 11px 20px;font-weight:700;font-size:13px">${esc(p.symbol)}</td><td style="padding:11px 12px;text-align:right;font-family:'JetBrains Mono',monospace">$${p.entry_price}</td><td style="padding:11px 12px;text-align:right;font-family:'JetBrains Mono',monospace">$${p.last}</td><td style="padding:11px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:${p.unrealized_pnl >= 0 ? '#11A06B' : '#E0504F'}">${p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pct}%</td><td style="padding:11px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8B8A93">+${p.dist_to_target_pct}% / −${p.dist_to_stop_pct}%</td><td style="padding:11px 20px 11px 12px;text-align:right"><button data-act="close" data-id="${esc(p.symbol)}" style="border:1px solid #E0DED5;background:#fff;color:#E0504F;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer">Close</button></td></tr>`).join('');
+  const closed = (d.closed_trades || []).slice().reverse().map(t => `<tr style="border-top:1px solid #F1EFE8"><td style="padding:10px 12px 10px 20px;font-weight:700;font-size:12.5px">${esc(t.symbol)}</td><td style="padding:10px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px">$${t.entry_price}→$${t.exit_price}</td><td style="padding:10px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:${t.pnl >= 0 ? '#11A06B' : '#E0504F'}">${t.pnl >= 0 ? '+' : ''}$${t.pnl}</td><td style="padding:10px 12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:${t.pnl >= 0 ? '#11A06B' : '#E0504F'}">${t.pnl_pct}%</td><td style="padding:10px 20px 10px 12px;text-align:right;font-size:11.5px;color:#8B8A93">${esc(t.reason)}</td></tr>`).join('');
+  return `<div style="background:rgba(201,138,30,.08);border:1px solid rgba(201,138,30,.22);border-radius:12px;padding:11px 15px;font-size:12px;color:#9A6B12;margin-bottom:16px;line-height:1.5"><b>SIMULATED</b> — fills are modeled against live prices at last trade ± ${d.slippage_bps}bps slippage. Not a brokerage; this is honest forward-validation of the model, not real trading.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+      ${stat('Equity', '$' + d.equity.toLocaleString())}${stat('Total return', (d.return_pct >= 0 ? '+' : '') + d.return_pct + '%', rc)}${stat('Cash', '$' + d.cash.toLocaleString())}${stat('Realized P&L', (d.realized_pnl >= 0 ? '+' : '') + '$' + d.realized_pnl, d.realized_pnl >= 0 ? '#11A06B' : '#E0504F')}${stat('Win rate', d.win_rate != null ? d.win_rate + '%' : '–')}
+    </div>
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;overflow:hidden;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="padding:14px 20px;border-bottom:1px solid #EEECE5;font-size:13.5px;font-weight:700">Open positions</div>
+      ${open ? `<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#FAF9F6">${['Symbol', 'Entry', 'Last', 'Unrl', 'Tgt / Stop', ''].map((h, i) => `<th style="text-align:${i === 0 ? 'left' : 'right'};padding:10px ${i === 0 ? '12px 10px 20px' : '12px'};font-size:10.5px;color:#9C9CA6;text-transform:uppercase;font-weight:600">${h}</th>`).join('')}</tr></thead><tbody>${open}</tbody></table>` : '<div style="padding:24px 20px;color:#9C9CA6;font-size:13px">None open — arm a pick from the Scanner.</div>'}
+    </div>
+    <div style="background:#fff;border:1px solid #E8E6DF;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.03)">
+      <div style="padding:14px 20px;border-bottom:1px solid #EEECE5;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13.5px;font-weight:700">Closed trades</span><button data-act="resetPaper" style="border:1px solid #E0DED5;background:#fff;color:#8B8A93;font-size:11px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer">Reset</button></div>
+      ${closed ? `<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#FAF9F6">${['Symbol', 'Entry→Exit', 'P&L', '%', 'Why'].map((h, i) => `<th style="text-align:${i === 0 ? 'left' : 'right'};padding:10px ${i === 0 ? '12px 10px 20px' : i === 4 ? '10px 20px 10px 12px' : '12px'};font-size:10.5px;color:#9C9CA6;text-transform:uppercase;font-weight:600">${h}</th>`).join('')}</tr></thead><tbody>${closed}</tbody></table>` : '<div style="padding:24px 20px;color:#9C9CA6;font-size:13px">No closed trades yet.</div>'}
+    </div>`;
+}
+function paperHTML() {
+  return `<h1 style="margin:0 0 4px;font-size:25px;font-weight:800;letter-spacing:-.025em">Paper portfolio</h1>
+    <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E78">Simulated forward-validation of the model. Arm trades from the Scanner; stops and targets fire on the live feed.</p>
+    <div id="paperBody">${paperBodyHTML()}</div>`;
+}
+
+// ============================ shell / views ============================
+function footerHTML() {
+  return `<div style="max-width:1340px;margin:24px auto 0;font-size:11.5px;color:#A9A8A0;line-height:1.5">Conviction and floor are <b>calibrated model estimates</b>, validated on held-out history and suppressed when below display quality — they are not guarantees, and large fast moves are rare. Paper trading is simulated. Not investment advice.</div>`;
+}
+function viewHTML() {
+  if (S.view === 'watch') return watchHTML();
+  if (S.view === 'alerts') return alertsHTML();
+  if (S.view === 'paper') return paperHTML();
+  return scannerHTML();
+}
+function renderShell() {
+  document.getElementById('app').innerHTML = headerHTML() + `<main style="max-width:1340px;margin:0 auto;padding:26px 28px 60px"><div id="viewRoot">${viewHTML()}</div></main>`;
+  renderTrust(); renderToasts();
+  if (S.view === 'scanner') mountTV();
+  if (S.view === 'paper') loadPortfolio();
+}
+function renderView() {
+  const root = document.getElementById('viewRoot'); if (!root) return renderShell();
+  if (S.view === 'alerts') { const l = document.getElementById('alertList'); if (l) { l.innerHTML = alertsListHTML(); return; } }
+  root.innerHTML = viewHTML();
+  if (S.view === 'scanner') mountTV();
+}
+function renderToasts() {
+  let el = document.getElementById('toasts');
+  if (!el) { el = document.createElement('div'); el.id = 'toasts'; el.style.cssText = 'position:fixed;top:74px;right:22px;z-index:90;display:flex;flex-direction:column;gap:10px;width:300px'; document.body.appendChild(el); }
+  el.innerHTML = S.toasts.map(t => `<div style="background:#fff;border:1px solid #E8E6DF;border-left:3px solid ${ACCENT};border-radius:12px;padding:12px 14px;box-shadow:0 8px 24px rgba(20,20,20,.1);animation:toastin .25s ease"><div style="font-size:12.5px;font-weight:700;color:#17171C;margin-bottom:2px">${esc(t.title)}</div><div style="font-size:12px;color:#6E6E78;line-height:1.4">${esc(t.body)}</div></div>`).join('');
+}
+const ago = ts => { if (!ts) return '–'; const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 90 ? s + 's' : Math.round(s / 60) + 'm'; };
+
+let tvSym = null;
+function mountTV() {
+  const slot = document.querySelector('.tv-slot'); if (!slot) return;
+  const sym = slot.dataset.sym; if (slot.dataset.loaded === sym) return;
+  slot.dataset.loaded = sym; slot.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+  const sc = document.createElement('script');
+  sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'; sc.async = true;
+  sc.innerHTML = JSON.stringify({ symbol: sym, interval: 'D', theme: 'light', style: '1', locale: 'en', autosize: true, hide_top_toolbar: true, hide_legend: false, allow_symbol_change: false });
+  slot.querySelector('.tradingview-widget-container').appendChild(sc);
+}
+
+// ============================ modal (analyst / history / trust) ============================
+function openModal(html) { document.getElementById('modalBox').innerHTML = `<span onclick="closeModal()" style="float:right;cursor:pointer;color:#BDBBB4;font-family:'JetBrains Mono',monospace;font-size:12px">close ✕</span>` + html; document.getElementById('modal').classList.add('show'); }
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+window.closeModal = closeModal;
+function trustModal() {
+  const c = S.calib; let h = `<h3 style="margin:0 0 10px;font-size:16px">Model trust</h3>`;
+  if (!c || !c.available) { h += `<p style="color:#6E6E78;font-size:13px">No trained model is loaded — the leaderboard is ranking by the activity score and probabilities are hidden.</p>`; return openModal(h); }
+  const v = c.validation || {}, pop = v.pop || {}, safe = v.safe || {};
+  h += `<p style="font-size:12.5px;color:#6E6E78;margin:0 0 14px;line-height:1.5">Version <b>${esc(c.model_version || '–')}</b>${c.synthetic ? ' · <span style="color:#C98A1E">synthetic data</span>' : ''} · ${c.trustworthy ? '<span style="color:#0E8C5A">display-validated</span>' : '<span style="color:#C98A1E">below display threshold</span>'}</p>`;
+  const tbl = (rowsArr) => `<table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11.5px">${rowsArr}</table>`;
+  h += tbl(`<tr style="color:#9C9CA6;text-align:right"><th style="text-align:left;padding:4px 8px">head</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">base</th><th style="padding:4px 8px">Brier</th><th style="padding:4px 8px">AP</th><th style="padding:4px 8px">prec@5</th></tr>` +
+    [['pop', pop], ['safe', safe]].map(([k, m]) => `<tr style="text-align:right;border-top:1px solid #EEECE5"><td style="text-align:left;padding:5px 8px;color:#17171C">${k}</td><td style="padding:5px 8px">${m.n ?? '–'}</td><td style="padding:5px 8px">${m.base_rate != null ? (m.base_rate * 100).toFixed(1) + '%' : '–'}</td><td style="padding:5px 8px">${m.brier ?? '–'}</td><td style="padding:5px 8px">${m.average_precision ?? '–'}</td><td style="padding:5px 8px">${m.precision_at_k ? (m.precision_at_k['5'] ?? '–') : '–'}</td></tr>`).join(''));
+  if (pop.reliability && pop.reliability.length) {
+    h += `<h4 style="margin:16px 0 6px;font-size:13px">Reliability — P(pop) predicted vs observed</h4>` + tbl(`<tr style="color:#9C9CA6;text-align:right"><th style="text-align:left;padding:4px 8px">bin</th><th style="padding:4px 8px">predicted</th><th style="padding:4px 8px">observed</th><th style="padding:4px 8px">n</th></tr>` + pop.reliability.map(b => `<tr style="text-align:right;border-top:1px solid #EEECE5"><td style="text-align:left;padding:5px 8px">${esc(b.bin)}</td><td style="padding:5px 8px">${(b.predicted * 100).toFixed(1)}%</td><td style="padding:5px 8px">${(b.observed * 100).toFixed(1)}%</td><td style="padding:5px 8px">${b.n}</td></tr>`).join(''));
   }
-  box.innerHTML=h; m.classList.add("show");
+  if (c.feature_skew_note) h += `<p style="font-size:11px;color:#A9A8A0;margin-top:14px;line-height:1.5">${esc(c.feature_skew_note)}</p>`;
+  openModal(h);
 }
-function closeTrust(){ document.getElementById("trustModal").classList.remove("show"); }
+function analystModal(sym) {
+  openModal(`<h3 style="margin:0 0 10px;font-size:16px">Analyst note · ${esc(sym)}</h3><div id="mc" style="color:#6E6E78;font-size:13px">writing…</div>`);
+  fetch(API + '/api/analyst/' + sym).then(r => r.json()).then(d => {
+    const el = document.getElementById('mc'); if (!el) return;
+    if (!d.available) { el.innerHTML = esc(d.reason || 'analyst notes disabled'); return; }
+    const cav = (d.caveats || []).map(x => `<div style="color:#C98A1E;font-size:12px;margin-top:8px">⚠ ${esc(x)}</div>`).join('');
+    const flag = d.flagged ? `<div style="color:#C98A1E;font-size:12px;margin-top:8px">⚠ A figure in this note could not be matched to source stats.</div>` : '';
+    const news = (d.news || []).length ? `<div style="margin-top:12px;border-top:1px solid #EEECE5;padding-top:10px">${d.news.map(n => `<a href="${esc(n.url)}" target="_blank" rel="noopener" style="display:block;color:#6E6E78;font-size:12px;text-decoration:none;padding:3px 0">${esc(n.title)} — <span style="color:#9C9CA6">${esc(n.publisher)}</span></a>`).join('')}</div>` : '';
+    el.innerHTML = `<div style="color:#17171C;font-size:13.5px;line-height:1.6">${esc(d.note)}</div>${cav}${flag}${news}`;
+  }).catch(() => { const el = document.getElementById('mc'); if (el) el.textContent = 'analyst service unavailable'; });
+}
+function historyModal(sym) {
+  openModal(`<h3 style="margin:0 0 10px;font-size:16px">Real historical record · ${esc(sym)}</h3><div id="mc" style="color:#6E6E78;font-size:13px">computing…</div>`);
+  fetch(API + '/api/likelihood/' + sym).then(r => r.json()).then(d => {
+    const el = document.getElementById('mc'); if (!el) return;
+    if (d.error) { el.innerHTML = 'No real history yet.<br>' + esc(d.error); return; }
+    if (!d.n) { el.innerHTML = 'No comparable historical setups for ' + esc(sym) + '.'; return; }
+    const thin = d.n < 12;
+    el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div><div style="font-size:10.5px;color:#9C9CA6;text-transform:uppercase">Hit +${d.target_pct}% in ${d.horizon_days}d</div><div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:${d.freq_target >= 20 ? '#11A06B' : '#17171C'}">${d.freq_target == null ? '–' : d.freq_target + '%'}</div><div style="font-size:11px;color:${thin ? '#C98A1E' : '#9C9CA6'}">n = ${d.n}${thin ? ' · thin' : ''}</div></div>
+      <div><div style="font-size:10.5px;color:#9C9CA6;text-transform:uppercase">Median fwd</div><div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:${d.median_fwd > 0 ? '#11A06B' : '#E0504F'}">${d.median_fwd > 0 ? '+' : ''}${d.median_fwd}%</div><div style="font-size:11px;color:#9C9CA6">${d.p25_fwd}% to ${d.p75_fwd}%</div></div>
+      <div><div style="font-size:10.5px;color:#9C9CA6;text-transform:uppercase">Round-trip ≤3wk</div><div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700">${d.recover_rate == null ? '–' : d.recover_rate + '%'}</div><div style="font-size:11px;color:#9C9CA6">of cases that dipped</div></div>
+    </div><p style="font-size:11.5px;color:#A9A8A0;margin-top:14px;line-height:1.5">Across ${d.n} past days where ${esc(sym)} looked like it does now — an empirical frequency, not a forecast. The model estimate is checked against this.</p>`;
+  }).catch(() => { const el = document.getElementById('mc'); if (el) el.textContent = 'history service unavailable'; });
+}
 
-function connect(){
+// ============================ events ============================
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const act = t.dataset.act, id = t.dataset.id;
+  switch (act) {
+    case 'go': S.view = t.dataset.v; renderShell(); break;
+    case 'trust': trustModal(); break;
+    case 'select': S.selectedId = id; renderView(); break;
+    case 'selectGo': S.view = 'scanner'; S.selectedId = id; renderShell(); break;
+    case 'watch': e.stopPropagation(); toggleWatch(id); renderView(); break;
+    case 'watchF': toggleWatch(id); renderView(); break;
+    case 'unwatch': toggleWatch(id); renderView(); break;
+    case 'arm': armTrade(id, t); break;
+    case 'close': closePos(id); break;
+    case 'resetPaper': if (confirm('Reset the paper account?')) fetch(API + '/api/paper/reset', { method: 'POST' }).then(loadPortfolio); break;
+    case 'analyst': analystModal(id); break;
+    case 'history': historyModal(id); break;
+    case 'toggleAlert': { const i = +t.dataset.i; S.alerts = S.alerts.map((x, j) => j === i ? { ...x, armed: !x.armed, triggered: false } : x); saveAlerts(); renderView(); break; }
+    case 'removeAlert': { const i = +t.dataset.i; S.alerts = S.alerts.filter((_, j) => j !== i); saveAlerts(); renderView(); break; }
+    case 'addAlert': addAlert(); break;
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  if (t.dataset.act === 'formStock') S.form.stock = t.value;
+  else if (t.dataset.act === 'formType') { S.form.type = t.value; const fm = document.getElementById('alertForm'); if (fm) fm.innerHTML = alertFormHTML(); }
+});
+document.addEventListener('input', e => { const t = e.target.closest('[data-act]'); if (t && t.dataset.act === 'formValue') S.form.value = t.value; });
+
+function toggleWatch(id) { S.watch = S.watch.includes(id) ? S.watch.filter(x => x !== id) : [...S.watch, id]; saveWatch(); }
+function addAlert() {
+  const v = parseFloat(S.form.value), sym = S.form.stock || (S.rows[0] && S.rows[0].symbol);
+  if (!sym || isNaN(v)) return;
+  S.alerts = [...S.alerts, { stock: sym, type: S.form.type, value: v, armed: true, triggered: false }]; saveAlerts(); S.form.value = ''; renderView();
+}
+function armTrade(sym, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'arming…'; }
+  fetch(API + '/api/paper/arm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym }) })
+    .then(r => r.json()).then(res => {
+      if (!res.ok) pushToast('Could not arm ' + sym, res.error || 'unknown error');
+      else { pushToast('Armed paper trade · ' + sym, 'Entry $' + res.position.entry_price.toFixed(2) + ' · target +10% · stop −5%'); loadPortfolio(); }
+      if (S.view === 'scanner') renderView();
+    }).catch(() => { pushToast('Arm failed', 'Is the backend running?'); if (S.view === 'scanner') renderView(); });
+}
+function closePos(sym) { fetch(API + '/api/paper/close/' + sym, { method: 'POST' }).then(loadPortfolio); }
+
+// ============================ boot ============================
+function connect() {
   let ws;
-  try{ ws=new WebSocket(WS); }catch(e){ return poll(); }
-  ws.onopen=()=>{ $dot.classList.add("on"); $conn.textContent="live"; };
-  ws.onmessage=ev=>{ const d=JSON.parse(ev.data); render(d.rows,d); };
-  ws.onclose=()=>{ $dot.classList.remove("on"); $conn.textContent="reconnecting"; setTimeout(connect,2000); };
-  ws.onerror=()=>{ ws.close(); };
+  try { ws = new WebSocket(WS); } catch (e) { return poll(); }
+  ws.onmessage = ev => { try { ingest(JSON.parse(ev.data)); } catch (e) {} };
+  ws.onclose = () => setTimeout(connect, 2500);
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
-async function poll(){
-  $conn.textContent="polling";
-  try{ const d=await(await fetch(API+"/api/leaderboard")).json(); $dot.classList.add("on"); render(d.rows,d); }
-  catch(e){ $dot.classList.remove("on"); $conn.textContent="offline"; }
-  setTimeout(poll,3000);
+function poll() {
+  fetch(API + '/api/leaderboard').then(r => r.json()).then(ingest).catch(() => {});
+  setTimeout(poll, 3000);
 }
-
-// ----- paper portfolio drawer -----
-let drawerOpen=false;
-function toggleDrawer(){ drawerOpen?closeDrawer():openDrawer(); }
-function openDrawer(){ drawerOpen=true; document.getElementById("drawer").classList.add("show"); loadPortfolio(); }
-function closeDrawer(){ drawerOpen=false; document.getElementById("drawer").classList.remove("show"); }
-
-async function loadPortfolio(){
-  let d;
-  try{ d=await(await fetch(API+"/api/paper/portfolio")).json(); }catch(e){ return; }
-  // header button always reflects equity
-  const btn=document.getElementById("paperBtn");
-  if(btn){ btn.textContent="paper $"+Math.round(d.equity).toLocaleString(); btn.style.color = d.return_pct>=0?"var(--rise)":"var(--fall)"; }
-  if(!drawerOpen) return;
-  const body=document.getElementById("drawerBody");
-  const rc = d.return_pct>=0?"rise":"fall";
-  const open=(d.open_positions||[]).map(p=>`<tr><td class="l">${p.symbol}</td><td>$${p.entry_price}</td><td>$${p.last}</td><td class="${p.unrealized_pnl>=0?'rise':'fall'}">${p.unrealized_pnl>=0?'+':''}${p.unrealized_pct}%</td><td>${p.dist_to_target_pct}% / -${p.dist_to_stop_pct}%</td><td><span class="pclose" onclick="closePos('${p.symbol}')">close</span></td></tr>`).join("");
-  const closed=(d.closed_trades||[]).slice().reverse().map(t=>`<tr><td class="l">${t.symbol}</td><td>$${t.entry_price}→$${t.exit_price}</td><td class="${t.pnl>=0?'rise':'fall'}">${t.pnl>=0?'+':''}$${t.pnl}</td><td class="${t.pnl>=0?'rise':'fall'}">${t.pnl_pct}%</td><td>${t.reason}</td></tr>`).join("");
-  body.innerHTML=`
-    <div class="simbadge">SIMULATED — fills modeled vs live prices at last trade ± ${d.slippage_bps}bps slippage. Not a brokerage; this is forward-validation of the model, not real trading.</div>
-    <div class="pstat"><span>Equity</span><b>$${d.equity.toLocaleString()}</b></div>
-    <div class="pstat"><span>Total return</span><b class="${rc}">${d.return_pct>=0?'+':''}${d.return_pct}%</b></div>
-    <div class="pstat"><span>Cash</span><b>$${d.cash.toLocaleString()}</b></div>
-    <div class="pstat"><span>Realized P&L</span><b class="${d.realized_pnl>=0?'rise':'fall'}">${d.realized_pnl>=0?'+':''}$${d.realized_pnl}</b></div>
-    <div class="pstat"><span>Unrealized P&L</span><b class="${d.unrealized_pnl>=0?'rise':'fall'}">${d.unrealized_pnl>=0?'+':''}$${d.unrealized_pnl}</b></div>
-    <div class="pstat"><span>Win rate (n=${d.n_closed})</span><b>${d.win_rate!=null?d.win_rate+'%':'–'}</b></div>
-    <h3 style="font-size:12px;margin-top:16px;color:var(--faint)">Open positions</h3>
-    ${open?`<table class="ptable"><tr><th class="l">sym</th><th>entry</th><th>last</th><th>unrl</th><th>tgt/stop</th><th></th></tr>${open}</table>`:'<p class="loading">none open — arm a pick from the leaderboard</p>'}
-    <h3 style="font-size:12px;margin-top:16px;color:var(--faint)">Closed trades</h3>
-    ${closed?`<table class="ptable"><tr><th class="l">sym</th><th>entry→exit</th><th>P&L</th><th>%</th><th>why</th></tr>${closed}</table>`:'<p class="loading">none yet</p>'}
-    <p style="margin-top:16px"><span class="pclose" onclick="resetPaper()" style="color:var(--faint)">reset paper account</span></p>`;
-}
-async function closePos(sym){ try{ await fetch(API+"/api/paper/close/"+sym,{method:"POST"}); loadPortfolio(); }catch(e){} }
-async function resetPaper(){ if(!confirm("Reset the paper account to starting cash?"))return; try{ await fetch(API+"/api/paper/reset",{method:"POST"}); loadPortfolio(); }catch(e){} }
-
-loadCalibration();
-setInterval(loadCalibration, 60000);
-loadPortfolio();
-setInterval(loadPortfolio, 5000);
+S.clock = new Date().toLocaleTimeString('en-US', { hour12: false });
+renderShell();
+loadCalib(); setInterval(loadCalib, 60000);
+loadPortfolio(); setInterval(loadPortfolio, 5000);
 connect();
+// REST fallback kick in case WS never connects
+fetch(API + '/api/leaderboard').then(r => r.json()).then(d => { if (!S.payload.ts) ingest(d); }).catch(() => {});
+setInterval(() => {
+  S.clock = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const c = document.getElementById('clock'); if (c) c.textContent = S.clock;
+}, 1000);
+window.addEventListener('resize', () => { if (S.view === 'scanner') mountTV(); });
 </script>
 </body>
 </html>
