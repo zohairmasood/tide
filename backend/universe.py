@@ -51,7 +51,10 @@ def screen_universe(
     if isinstance(date, dt.datetime):
         date = date.date()
     iso = date.isoformat()
-    cache_path = CACHE_DIR / f"{iso}.json"
+    # UNIVERSE_LIMIT caps the scan to the most-liquid N names (0 = no cap). This
+    # bounds the cost of the live broad scan, which scores every name each tick.
+    limit = int(os.getenv("UNIVERSE_LIMIT", "200"))  # sane default; set 0 to uncap
+    cache_path = CACHE_DIR / f"{iso}_{limit}.json"
     if cache and cache_path.exists():
         try:
             return json.loads(cache_path.read_text())
@@ -61,16 +64,20 @@ def screen_universe(
     grouped: dict[str, Bar] = hist.grouped_daily(date)
     cs = _cs_symbols(hist) if restrict_to_cs else None
 
-    out: list[str] = []
+    scored: list[tuple[str, float]] = []
     for sym, bar in grouped.items():
         if cs is not None and sym not in cs:
             continue
         if not (min_price <= bar.c <= max_price):
             continue
-        if bar.c * bar.v < min_dollar_volume:
+        dv = bar.c * bar.v
+        if dv < min_dollar_volume:
             continue
-        out.append(sym)
-    out.sort()
+        scored.append((sym, dv))
+    if limit > 0:
+        scored.sort(key=lambda r: -r[1])      # most liquid first
+        scored = scored[:limit]
+    out = sorted(s for s, _ in scored)
     if cache and out:
         cache_path.write_text(json.dumps(out))
     return out
