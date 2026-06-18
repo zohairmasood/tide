@@ -1,10 +1,13 @@
 fastapi>=0.110
 uvicorn[standard]>=0.27
 requests>=2.31
-numpy>=1.26
-scikit-learn>=1.4
-joblib>=1.3
 anthropic>=0.40
+# Pinned so the deployed env matches the trained model.joblib (cross-version
+# sklearn/numpy pickles can fail to load). Re-pin if you retrain after upgrading.
+numpy==2.4.6
+scipy==1.17.1
+scikit-learn==1.9.0
+joblib==1.5.3
 # optional, opt-in via `python train.py --model lgbm`:
 # lightgbm>=4.1
 # optional, only if using Quiver for the smart-money overlay (Finnhub uses plain requests):
