@@ -22,7 +22,7 @@ services:
       - key: TOP_N
         value: "5"
       - key: SAFE_THRESHOLD
-        value: "0.50"
+        value: "0.40"
       - key: SAFE_BUFFER
         value: "0.05"
       - key: ANALYST_MODEL

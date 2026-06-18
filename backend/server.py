@@ -47,7 +47,7 @@ REFRESH_SECONDS = float(os.getenv("REFRESH_SECONDS", "3"))
 SCREEN_SECONDS = float(os.getenv("SCREEN_SECONDS", "900"))
 TOP_N = int(os.getenv("TOP_N", "5"))
 CANDIDATE_POOL = int(os.getenv("CANDIDATE_POOL", "50"))
-SAFE_THRESHOLD = float(os.getenv("SAFE_THRESHOLD", "0.50"))
+SAFE_THRESHOLD = float(os.getenv("SAFE_THRESHOLD", "0.40"))
 
 provider = get_provider()
 _universe = provider.universe()
